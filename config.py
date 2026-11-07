@@ -3,7 +3,8 @@ import os
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR    = os.path.join(PROJECT_DIR, "data")
-REPORT_DIR  = os.path.join(DATA_DIR, "reports")
+# 报表目录：看板与 main.py 共用；可用 CAMPUS_REPORT_DIR 指向某次真实视频评估的报表
+REPORT_DIR  = os.environ.get("CAMPUS_REPORT_DIR", os.path.join(DATA_DIR, "reports"))
 # 可用 set CAMPUS_VIDEO=D:\path\to.mp4 临时切换视频源，无需改代码
 TEST_VIDEO  = os.environ.get("CAMPUS_VIDEO", os.path.join(DATA_DIR, "test_monitor.mp4"))
 # 合成测试视频用的车型图片源：可用环境变量 CAMPUS_CAR_DIR 覆盖，默认 D:\car

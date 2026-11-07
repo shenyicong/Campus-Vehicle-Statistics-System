@@ -1,6 +1,8 @@
 # 校园车辆智能统计系统 (Campus Vehicle Statistics System)
 
-基于 YOLO 目标检测的校园校门车辆智能统计系统：自动统计校门监控视频中 **轿车 / SUV / 货车 / 客车** 四类车辆的进出数量，按小时、按日生成统计报表，并提供网页实时看板，为校门口拥堵治理与校园停车资源规划提供数据依据。
+基于 YOLO 目标检测的车辆智能统计系统（以校园为例）：自动统计校门 / 停车场监控视频中 **轿车 / SUV / 货车 / 客车** 四类车辆的进出数量，按小时、按日生成统计报表与网页实时看板；并进一步由通行流量推导**大 / 小车位配比与规划用地**——大区域规划货车 / 客车停放，小车位规划 SUV / 轿车停放，为出入口拥堵治理与停车资源规划提供数据依据。
+
+> 摄像机装在校门、停车场入口或园区道路都可以，算法与代码不变；换位置后用 `tools/calibrate_line.py` 重新标定虚拟线即可。本仓库以校园为业务示例，不限定具体地点。
 
 ## 功能特性
 
@@ -8,15 +10,17 @@
 - **真实 YOLO 模型**：已接入自训练 YOLO11n ONNX，CPU 即可推理（letterbox 预处理 + 按类别 NMS 后处理）
 - **视频溯源**：支持本地视频文件与 RTSP 实时流（一行配置切换）
 - **轨迹跟踪**：轻量 IoU 跟踪器，跨帧关联同一车辆
-- **进出判定**：基于虚拟检测线 + 穿越方向，判定进校 / 出校
+- **进出判定**：基于虚拟检测线 + 穿越方向，判定进入 / 驶出
 - **统计分析**：按小时 / 按日聚合，输出 CSV 与 Excel
-- **实时看板**：Flask + Chart.js 网页仪表盘，定时刷新
+- **停车资源规划**：由分车型进出量推算峰值在场数 → 大 / 小车位数量、配比、用地面积（[`docs/parking_plan.md`](docs/parking_plan.md)）
+- **实时看板**：Flask + Chart.js，同屏展示进出统计与停车规划建议，5 秒刷新
 - **可复现训练**：AMD Radeon Cloud / ROCm 一键脚本（上传 → 切分 → 训练 → 导出 ONNX）
 
 ## 系统架构
 
 ```
 视频源 → 检测器 → 跟踪器(IoU) → 进出判定 → 计数器 → 报表(CSV/Excel) → 网页看板
+                                                    └→ 停车资源规划(大/小车位配比)
 ```
 
 ## 目录结构
@@ -29,6 +33,7 @@ campus_vehicle_system/
 ├── tracker.py                 # 轻量 IoU 跟踪器
 ├── counter.py                 # 虚拟线进出判定与计数
 ├── reporter.py                # 每小时 / 每日 CSV 与 Excel 报表
+├── parking_plan.py            # 由进出报表推导大 / 小车位需求（脚本与看板共用）
 ├── main.py                    # 端到端串联入口
 ├── make_test_video.py         # 用车型图片合成模拟校门监控测试视频
 ├── web_dashboard.py           # Flask + Chart.js 实时看板（端口 5000）
@@ -45,10 +50,13 @@ campus_vehicle_system/
 │   ├── eval_real_video.py     # 真实视频抽样检测评估（检出/置信度/框面积分档）
 │   ├── eval_count_video.py    # 固定机位视频端到端：检测+计数+报表+演示图（一次推理）
 │   ├── calibrate_line.py      # 虚拟线标定 + 车流是否静止判定
+│   ├── plan_parking.py        # 输出停车资源规划建议（md / csv / xlsx）
 │   └── plot_training_curves.py# 训练曲线四宫格图
 ├── docs/
 │   ├── real_video_eval.md     # 真实视频泛化评估记录
 │   ├── line_calibration.md    # 虚拟线标定与假跨线抑制
+│   ├── parking_plan.md        # 停车资源规划推导方法与边界
+│   ├── real_video_demo.jpg    # 带框带线演示图
 │   └── training_curves.png    # 训练曲线
 ├── cloud_setup_yolo26_env.sh  # 兜底：从零重建 ROCm 训练环境
 ├── models/.gitkeep            # 放 car_yolo.onnx（模型文件不入库）
@@ -112,6 +120,7 @@ python web_dashboard.py
 | `LINE_Y` | 进出判定虚拟线（归一化 y，0=顶 1=底）；换视频后用 `tools/calibrate_line.py` 标定，可用 `CAMPUS_LINE_Y` 覆盖 |
 | `ENTER_WHEN` | 穿越方向：`down`=向下为进校 |
 | `MIN_TRACK_MOVE` | 抑制框抖动假跨线的最小净位移（默认 0.03），可用 `CAMPUS_MIN_MOVE` 覆盖 |
+| `REPORT_DIR` | 报表目录（默认 `data/reports/`），可用 `CAMPUS_REPORT_DIR` 指向某次真实视频评估的报表目录，看板与 `main.py` 共用 |
 | `WEB_HOST` / `WEB_PORT` | 看板监听地址 / 端口（默认 127.0.0.1:5000） |
 
 ## 本次训练结果
@@ -143,6 +152,28 @@ python web_dashboard.py
 python tools/calibrate_line.py --video "D:/path/to.mp4" --frames 240
 python tools/eval_count_video.py --video "D:/path/to.mp4" --tile grid --line-y 0.65 --out data/real_eval_demo
 ```
+
+## 应用定位：从流量统计到停车规划
+
+系统统计的是**通过虚拟线的分车型通行流量**，不是车位级占用检测；
+停车位规划是由流量**推算**的派生结论。算法层与业务位置解耦：
+校门 / 停车场入口 / 园区道路共用同一套代码，换机位只需重标定 `LINE_Y`。
+
+| 决策 | 用到的报表字段 | 输出 |
+|---|---|---|
+| 拥堵治理 | 每小时进出合计、高峰小时 | 疏导时段、出入口通行能力评估 |
+| 停车资源规划 | 分车型峰值在场数 | 小车位（轿车 / SUV）与大车位（货车 / 客车）数量、配比、用地面积 |
+
+```bash
+python tools/plan_parking.py                      # 默认读 data/reports/hourly.csv
+python tools/plan_parking.py --hourly <某次评估>/reports/hourly.csv --out-dir <输出目录>
+python web_dashboard.py                           # 看板同屏展示进出统计与规划建议
+```
+
+以重庆内环高速俯拍真实视频的报表为例（12.1 秒 → 1 个小时桶，仅演示链路）：
+峰值在场小车位 32 / 大车位 4 → **建议小车位 39 个、大车位 5 个**
+（88.6% / 11.4%），规划用地约 **941.6 ㎡**，高峰小时通行 **72 辆次**。
+公式、默认参数、前提与局限见 [`docs/parking_plan.md`](docs/parking_plan.md)。
 
 ## 云端训练流程
 

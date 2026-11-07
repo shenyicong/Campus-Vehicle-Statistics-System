@@ -4,13 +4,21 @@ import csv
 import json
 
 import config
+import parking_plan
 
 try:
     from flask import Flask, jsonify, Response
 except ImportError:
     Flask = None
 
-app = Flask(__name__) if Flask else None
+
+class _NoApp:
+    """Flask 未安装时的占位对象，保证模块可被导入 / 被其他脚本安全引用"""
+    def route(self, *args, **kwargs):
+        return lambda f: f
+
+
+app = Flask(__name__) if Flask else _NoApp()
 
 
 def load_csv(path):
@@ -39,35 +47,58 @@ HTML = """<!doctype html>
  .chart-box{background:#fff;border-radius:12px;padding:16px;margin-top:20px}
 </style></head>
 <body>
-<header>校园车辆智能统计系统 · 校门进出实时看板</header>
+<header>校园车辆智能统计系统 · 校门 / 停车场进出看板</header>
 <div class="wrap">
   <div class="cards" id="cards"></div>
   <div class="chart-box"><canvas id="bar"></canvas></div>
+  <h3 style="margin-top:24px">停车资源规划建议 <small style="font-weight:400;color:#888">（由分车型进出量推导）</small></h3>
+  <div class="cards" id="planCards"></div>
+  <table id="planTbl"><thead></thead><tbody></tbody></table>
   <h3 style="margin-top:24px">每小时明细</h3>
   <table id="tbl"><thead></thead><tbody></tbody></table>
 </div>
 <script>
+let chart=null;
 async function load(){
   const r = await fetch('/api/stats'); const d = await r.json();
   const cls = d.classes, cn = d.class_cn;
   let te=0, tx=0;
   cls.forEach(c=>{te+=d.total.enter[c]; tx+=d.total.exit[c];});
   document.getElementById('cards').innerHTML =
-    `<div class='card'><div class='n'>${te}</div><div class='l'>今日进校总数</div></div>`+
-    `<div class='card'><div class='n'>${tx}</div><div class='l'>今日出校总数</div></div>`+
+    `<div class='card'><div class='n'>${te}</div><div class='l'>今日进入总数</div></div>`+
+    `<div class='card'><div class='n'>${tx}</div><div class='l'>今日驶出总数</div></div>`+
     cls.map(c=>`<div class='card'><div class='n'>${d.total.enter[c]+d.total.exit[c]}</div><div class='l'>${cn[c]} 进出</div></div>`).join('');
   const labels = cls.map(c=>cn[c]);
-  new Chart(document.getElementById('bar'),{type:'bar',data:{labels,datasets:[
-    {label:'进校',data:cls.map(c=>d.total.enter[c]),backgroundColor:'#185FA5'},
-    {label:'出校',data:cls.map(c=>d.total.exit[c]),backgroundColor:'#E24B4A'}]},
-    options:{responsive:true,plugins:{title:{display:true,text:'各车型进出数量'}}}});
+  const cfg={type:'bar',data:{labels,datasets:[
+    {label:'进入',data:cls.map(c=>d.total.enter[c]),backgroundColor:'#185FA5'},
+    {label:'驶出',data:cls.map(c=>d.total.exit[c]),backgroundColor:'#E24B4A'}]},
+    options:{responsive:true,plugins:{title:{display:true,text:'各车型进出数量'}}}};
+  // 定时刷新时复用同一个 Chart 实例，避免 "Canvas is already in use"
+  if(chart){ chart.data=cfg.data; chart.update(); }
+  else { chart=new Chart(document.getElementById('bar'),cfg); }
   const rows = d.hourly;
   if(rows.length){ const cols=Object.keys(rows[0]);
     document.querySelector('#tbl thead').innerHTML='<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
     document.querySelector('#tbl tbody').innerHTML=rows.map(r=>'<tr>'+cols.map(c=>`<td>${r[c]}</td>`).join('')+'</tr>').join('');
   }
 }
-load(); setInterval(load, 5000);
+async function loadPlan(){
+  const r = await fetch('/api/parking_plan'); const p = await r.json();
+  const g = p.groups, ph = p.peak_hour;
+  document.getElementById('planCards').innerHTML =
+    `<div class='card'><div class='n'>${g.small.recommended_slots}</div><div class='l'>建议小车位（轿车 / SUV）</div></div>`+
+    `<div class='card'><div class='n'>${g.large.recommended_slots}</div><div class='l'>建议大车位（货车 / 客车）</div></div>`+
+    `<div class='card'><div class='n'>${p.total_area_sqm}</div><div class='l'>规划用地约 ㎡</div></div>`+
+    `<div class='card'><div class='n'>${ph?ph.throughput:'-'}</div><div class='l'>高峰小时通行辆次 ${ph?ph.period:''}</div></div>`;
+  const cols=['分区','对应车型','峰值在场数','建议泊位数','单车位面积(㎡)','含通道用地(㎡)','占比'];
+  const rows=[
+    ['小车位','轿车 / SUV',g.small.peak_occupancy,g.small.recommended_slots,g.small.slot_area_sqm,g.small.area_with_aisle_sqm,g.small.share_pct+'%'],
+    ['大车位','货车 / 客车',g.large.peak_occupancy,g.large.recommended_slots,g.large.slot_area_sqm,g.large.area_with_aisle_sqm,g.large.share_pct+'%']
+  ];
+  document.querySelector('#planTbl thead').innerHTML='<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+  document.querySelector('#planTbl tbody').innerHTML=rows.map(r=>'<tr>'+r.map(c=>`<td>${c}</td>`).join('')+'</tr>').join('');
+}
+load(); loadPlan(); setInterval(()=>{load();loadPlan();}, 5000);
 </script></body></html>"""
 
 
@@ -89,9 +120,16 @@ def api_stats():
                     "total": total, "hourly": hourly, "daily": daily})
 
 
+@app.route("/api/parking_plan")
+def api_parking_plan():
+    """把分车型进出量换算成大 / 小车位需求，供看板「停车资源规划」区块使用"""
+    result = parking_plan.compute(load_csv(config.HOURLY_CSV), classes=config.CLASSES)
+    return jsonify({k: v for k, v in result.items() if k != "timeline"})
+
+
 def run():
-    if not app:
-        raise SystemExit("Flask 未安装，请先: uv pip install flask")
+    if not Flask:
+        raise SystemExit("Flask 未安装，请先: pip install flask")
     app.run(host=config.WEB_HOST, port=config.WEB_PORT, debug=False)
 
 
