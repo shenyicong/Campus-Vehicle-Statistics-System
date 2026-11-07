@@ -35,7 +35,8 @@ def main():
 
     det = build_detector(w, h)
     trk = IoUTracker(iou_thresh=0.3, max_miss=30)
-    cnt = Counter(line_y=config.LINE_Y, enter_when=config.ENTER_WHEN, classes=config.CLASSES)
+    cnt = Counter(line_y=config.LINE_Y, enter_when=config.ENTER_WHEN,
+                  classes=config.CLASSES, min_move=config.MIN_TRACK_MOVE)
     rep = Reporter(config.HOURLY_CSV, config.DAILY_CSV, config.CLASSES)
 
     start = datetime.datetime.now()

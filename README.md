@@ -100,9 +100,10 @@ python web_dashboard.py
 | `YOLO_ONNX` | ONNX 模型路径（默认 `models/car_yolo.onnx`） |
 | `CONF_THRES` / `IOU_THRES` | 置信度阈值 / NMS IoU 阈值；`CONF_THRES` 可用 `CAMPUS_CONF` 覆盖 |
 | `TEST_VIDEO` / `USE_RTSP` / `RTSP_URL` | 视频源：本地文件（可用 `CAMPUS_VIDEO` 覆盖）或 RTSP 实时流 |
-| `TILE_MODE` / `TILE_SIZE` / `TILE_OVERLAP` | 竖屏长条画面分块推理：`auto` 自动 / `1` 强制 / `0` 关闭，可用 `CAMPUS_TILE` 覆盖 |
-| `LINE_Y` | 进出判定虚拟线（归一化 y，0=顶 1=底） |
+| `TILE_MODE` / `TILE_SIZE` / `TILE_OVERLAP` | 按画面**长边**自适应分块（竖屏切横块 / 宽幅横屏切竖块 / 近方形不切）：`auto` / `1` / `0`，可用 `CAMPUS_TILE` 覆盖 |
+| `LINE_Y` | 进出判定虚拟线（归一化 y，0=顶 1=底）；换视频后用 `tools/calibrate_line.py` 标定，可用 `CAMPUS_LINE_Y` 覆盖 |
 | `ENTER_WHEN` | 穿越方向：`down`=向下为进校 |
+| `MIN_TRACK_MOVE` | 抑制框抖动假跨线的最小净位移（默认 0.03），可用 `CAMPUS_MIN_MOVE` 覆盖 |
 | `WEB_HOST` / `WEB_PORT` | 看板监听地址 / 端口（默认 127.0.0.1:5000） |
 
 ## 本次训练结果
@@ -115,14 +116,15 @@ python web_dashboard.py
 
 ## 真实场景评估
 
-三段真实视频的评估数据、对比图与结论见 [`docs/real_video_eval.md`](docs/real_video_eval.md)，训练曲线见 [`docs/training_curves.png`](docs/training_curves.png)。
+六段真实素材的评估数据、对比图与结论见 [`docs/real_video_eval.md`](docs/real_video_eval.md)，虚拟线标定见 [`docs/line_calibration.md`](docs/line_calibration.md)，训练曲线见 [`docs/training_curves.png`](docs/training_curves.png)。
 
 - 夜间行车记录仪视频：框住的都是真车但漏检明显，平均置信度由同域 0.848 降到 0.535。
-- 白天固定机位俯拍竖屏视频：**首因是尺度压缩**——1080×1920 整图 letterbox 到 640×640 后有效宽度只剩约 360px，远景小车缩没。
-- 为此实现 `TiledYoloOnnxDetector`（竖屏自动分块，横屏退化为整图）。同一视频同一阈值下：检出框 **125 → 623**、零检出帧 **39.3% → 0%**、平均置信度 **0.497 → 0.588**，未引入误检，**无需重训模型**。
-- 火电厂街拍视频（大量半挂 / 罐车特写）：`truck` 100 框 (0.684)、`bus` 6 框 (0.760)，整车可见时分类正确 → 前两段 `truck/bus≈0` 是因为画面里没有这两类车，不是模型不会认。大字水印 / 路边招牌从未误检；超近距车头特写会类别混淆。
-- **结论修正**：类别能力基本够用，「补 50–100 帧微调」优先级下调；唯一确认的短板是俯拍远景客车，只需少量俯拍角度样本。下一步重点转向用连续无剪辑固定机位视频调 `LINE_Y` 与跟踪阈值。
-- 工具：`python tools/eval_real_video.py --video <路径>` 可对任意本地视频输出检出统计、按框面积分档与带框可视化帧。
+- 白天固定机位俯拍竖屏视频：**首因是尺度压缩**——1080×1920 整图 letterbox 到 640×640 后有效宽度只剩约 360px，远景小车缩没；分块后检出框 **125 → 623**、零检出帧 **39.3% → 0%**，无需重训。
+- 火电厂街拍视频：`truck` 100 框 (0.684)、`bus` 6 框 (0.760)，整车可见时分类正确 → 前两段 `truck/bus≈0` 是画面里没有这两类车，不是模型不会认；大字水印 / 招牌从未误检。
+- **分块方向修正**：`TiledYoloOnnxDetector` 改为按画面**长边**自适应（竖屏切横块、宽幅横屏切竖块、近方形不切）。1280×720 横屏密集车流检出框 **312 → 899**、零检出 **36.1% → 14.8%**；竖屏与合成横屏回归均无退化。
+- **虚拟线标定与假过车抑制**：`tools/calibrate_line.py` 发现俯拍画面车辆 cy 常全在 0.59 以上，默认 `LINE_Y=0.5` 落在空白区导致计数恒为 0；静止车流的框抖动还会制造假过车，已加 `MIN_TRACK_MOVE` 抑制（**20 次假过车 → 1 次**，真实过车不受影响）。
+- **结论**：类别能力基本够用，补数据优先级下调；唯一确认短板是俯拍远景客车。六段现有素材都不满足「固定机位 + 镜头不动 + 车流持续移动」，进出计数演示仍需补拍一段校门视频。
+- 工具：`eval_real_video.py`（检出统计 + 框面积分档 + 带框帧）、`calibrate_line.py`（虚拟线标定 + 车流是否静止判定）。
 
 ## 云端训练流程
 

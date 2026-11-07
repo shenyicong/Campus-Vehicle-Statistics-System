@@ -32,9 +32,14 @@ TILE_SIZE = 640
 TILE_OVERLAP = 0.4
 
 # 进出判定虚拟线（归一化 y，0=顶部 1=底部）
-LINE_Y = 0.5
+# 换视频后务必用 tools/calibrate_line.py 标定：俯拍画面上半部常是天空/建筑，
+# 默认 0.5 可能落在空白区导致计数恒为 0。可 set CAMPUS_LINE_Y=0.72 覆盖。
+LINE_Y = float(os.environ.get("CAMPUS_LINE_Y", "0.5"))
 # 车辆向下穿越=进校(enter)，向上=出校(exit)
 ENTER_WHEN = "down"
+# 抑制检测框抖动造成的假跨线：轨迹需相对参考点移动至少该幅度（占画面高度）
+# 静止车流/延时视频建议保持默认；可 set CAMPUS_MIN_MOVE=0.02 调整
+MIN_TRACK_MOVE = float(os.environ.get("CAMPUS_MIN_MOVE", "0.03"))
 
 # 报表
 HOURLY_CSV = os.path.join(REPORT_DIR, "hourly.csv")

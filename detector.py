@@ -134,15 +134,18 @@ class YoloOnnxDetector(Detector):
 
 
 class TiledYoloOnnxDetector(YoloOnnxDetector):
-    """竖屏长条画面的分块推理：解决 letterbox 压缩导致远景小车漏检。
+    """按画面长边方向切块的推理：解决 letterbox 压缩导致远景小车漏检。
 
-    1080x1920 竖屏整图送进 640x640 模型时，等比缩放后有效宽度只剩约 360px，
-    远处小车会缩到几像素而漏检。本类沿高度切成若干 w x tile_size 的重叠横块，
-    逐块调用父类 detect，坐标平移回原图后按类别再做一次 NMS 合并。
-    实测同一帧检出数可由 0~1 提升到 6~11，且不需要重新训练模型。
+    长条画面整图送进 640x640 模型时，短边被大幅压缩，远景小车会缩到几像素
+    而漏检。本类沿**长边**切成若干重叠块，逐块调用父类 detect，坐标平移回
+    原图后按类别再做一次 NMS 合并，不需要重新训练模型。
 
-    仅对「明显竖长」的画面自动启用；横屏切块反而会加重压缩，所以 auto
-    模式下横屏/近方形画面直接退化为整图推理。
+    - 竖屏 (h >= ratio*w)：沿高度切横块，如 1080x1920 -> 3~5 块 1080x640
+    - 宽幅横屏 (w >= ratio*h)：沿宽度切竖块，如 1280x720 -> 3 块 640x720
+    - 近方形：不切块，直接整图推理
+
+    实测竖屏固定机位视频检出框 125 -> 623；横屏密集车流单帧 1 -> 10、
+    20 -> 36。注意「沿高度切横块」用在横屏上会加重压缩，方向必须按长边选。
     """
     def __init__(self, onnx_path, classes, conf=0.25, iou=0.45,
                  mode="auto", tile_size=640, overlap=0.4, min_ratio=1.4):
@@ -158,22 +161,34 @@ class TiledYoloOnnxDetector(YoloOnnxDetector):
         h, w = frame.shape[:2]
         if self.mode == "0":
             return super().detect(frame)
-        if self.mode != "1" and h < w * self.min_ratio:
+
+        portrait = h >= w * self.min_ratio
+        landscape = w >= h * self.min_ratio
+        if self.mode != "1" and not (portrait or landscape):
             return super().detect(frame)
 
-        ts = min(self.tile_size, h)
+        # 沿长边切块：竖屏切横块，宽幅横屏切竖块；近方形强制模式沿用旧的纵向切法
+        axis = "y" if portrait else ("x" if landscape else "y")
+        length = h if axis == "y" else w
+        ts = min(self.tile_size, length)
         step = max(1, int(ts * (1 - self.overlap)))
-        starts = list(range(0, max(0, h - ts) + 1, step))
-        if not starts or starts[-1] != h - ts:
-            starts.append(h - ts)
-        starts = sorted(set(s for s in starts if 0 <= s <= h - ts))
+        starts = list(range(0, max(0, length - ts) + 1, step))
+        if not starts or starts[-1] != length - ts:
+            starts.append(length - ts)
+        starts = sorted(set(s for s in starts if 0 <= s <= length - ts))
 
         raw = []
-        for y0 in starts:
-            for b in super().detect(frame[y0:y0 + ts, 0:w]):
+        for s in starts:
+            if axis == "y":
+                crop, dx, dy = frame[s:s + ts, 0:w], 0, s
+            else:
+                crop, dx, dy = frame[0:h, s:s + ts], s, 0
+            for b in super().detect(crop):
                 b = list(b)
-                b[1] += y0
-                b[3] += y0
+                b[0] += dx
+                b[2] += dx
+                b[1] += dy
+                b[3] += dy
                 raw.append(b)
         return self._merge_nms(raw)
 
