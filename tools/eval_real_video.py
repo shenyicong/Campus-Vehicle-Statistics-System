@@ -13,7 +13,7 @@ import argparse
 import json
 import os
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 
 import cv2
 
@@ -65,6 +65,10 @@ def main():
     cls_counts = Counter()
     cls_confs = {c: [] for c in config.CLASSES}
     confs, per_frame, areas = [], [], []
+    # 按框面积分档：区分「远景小车」与「近距特写」两种完全不同的尺度域。
+    # 一段视频如果 huge 占比很高，说明多为局部特写，结论不能直接外推到俯拍监控。
+    area_classes = {"small(<30%)": Counter(), "mid(30-60%)": Counter(), "huge(>60%)": Counter()}
+    area_confs = defaultdict(list)
     saved, idx, samples = 0, 0, 0
     stride = max(1, args.max_samples // max(1, args.save_frames))
 
@@ -82,7 +86,11 @@ def main():
                 cls_counts[name] += 1
                 cls_confs.setdefault(name, []).append(float(score))
                 confs.append(float(score))
-                areas.append(max(0, x2 - x1) * max(0, y2 - y1) / max(1, w * h))
+                area = max(0, x2 - x1) * max(0, y2 - y1) / max(1, w * h)
+                areas.append(area)
+                key = "small(<30%)" if area < 0.30 else ("mid(30-60%)" if area <= 0.60 else "huge(>60%)")
+                area_classes[key][name] += 1
+                area_confs[key].append(float(score))
 
             if saved < args.save_frames and samples % stride == 0:
                 vis = frame.copy()
@@ -133,7 +141,15 @@ def main():
         lines.append("%-8s %-4s : %4d 框, 平均置信度 %.3f" %
                      (c, config.CLASS_CN.get(c, ""), cls_counts[c],
                       sum(cs) / len(cs) if cs else 0.0))
+    lines += ["", "--- 按框面积分档（判断是远景还是特写域）---"]
+    for key in ("small(<30%)", "mid(30-60%)", "huge(>60%)"):
+        cs = area_confs.get(key, [])
+        lines.append("%-14s %3d 框, 平均置信度 %.3f, 类别 %s" %
+                     (key, sum(area_classes[key].values()),
+                      sum(cs) / len(cs) if cs else 0.0,
+                      dict(area_classes[key])))
     lines += [
+        "  注: huge 占比高 = 多为车头/车厢局部特写，与俯拍监控的尺度域不同，结论勿直接外推。",
         "",
         "--- 说明 ---",
         "本脚本仅评估检测泛化能力，不做进出计数。",
@@ -153,6 +169,13 @@ def main():
         "zero_detect_frames": zero_frames, "avg_conf": round(avg_conf, 4),
         "median_conf": round(med_conf, 4), "avg_box_area_pct": round(avg_area, 2),
         "per_class": {c: cls_counts[c] for c in config.CLASSES},
+        "area_buckets": {
+            k: {"boxes": sum(area_classes[k].values()),
+                "avg_conf": round(sum(area_confs[k]) / len(area_confs[k]), 4)
+                if area_confs[k] else 0.0,
+                "per_class": dict(area_classes[k])}
+            for k in ("small(<30%)", "mid(30-60%)", "huge(>60%)")
+        },
         "saved_frames": saved,
     }
     with open(os.path.join(args.out, "summary.json"), "w", encoding="utf-8") as f:

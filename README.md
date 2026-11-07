@@ -115,13 +115,14 @@ python web_dashboard.py
 
 ## 真实场景评估
 
-两段真实视频的评估数据、对比图与结论见 [`docs/real_video_eval.md`](docs/real_video_eval.md)，训练曲线见 [`docs/training_curves.png`](docs/training_curves.png)。
+三段真实视频的评估数据、对比图与结论见 [`docs/real_video_eval.md`](docs/real_video_eval.md)，训练曲线见 [`docs/training_curves.png`](docs/training_curves.png)。
 
 - 夜间行车记录仪视频：框住的都是真车但漏检明显，平均置信度由同域 0.848 降到 0.535。
 - 白天固定机位俯拍竖屏视频：**首因是尺度压缩**——1080×1920 整图 letterbox 到 640×640 后有效宽度只剩约 360px，远景小车缩没。
 - 为此实现 `TiledYoloOnnxDetector`（竖屏自动分块，横屏退化为整图）。同一视频同一阈值下：检出框 **125 → 623**、零检出帧 **39.3% → 0%**、平均置信度 **0.497 → 0.588**，未引入误检，**无需重训模型**。
-- 仍待补数据：客车（蓝色大巴未认出）、极远景小车、夜间与车尾视角。
-- 工具：`python tools/eval_real_video.py --video <路径>` 可对任意本地视频输出检出统计与带框可视化帧。
+- 火电厂街拍视频（大量半挂 / 罐车特写）：`truck` 100 框 (0.684)、`bus` 6 框 (0.760)，整车可见时分类正确 → 前两段 `truck/bus≈0` 是因为画面里没有这两类车，不是模型不会认。大字水印 / 路边招牌从未误检；超近距车头特写会类别混淆。
+- **结论修正**：类别能力基本够用，「补 50–100 帧微调」优先级下调；唯一确认的短板是俯拍远景客车，只需少量俯拍角度样本。下一步重点转向用连续无剪辑固定机位视频调 `LINE_Y` 与跟踪阈值。
+- 工具：`python tools/eval_real_video.py --video <路径>` 可对任意本地视频输出检出统计、按框面积分档与带框可视化帧。
 
 ## 云端训练流程
 
