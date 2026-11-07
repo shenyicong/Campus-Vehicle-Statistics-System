@@ -19,12 +19,18 @@ IMG_EXT = (".jpg", ".jpeg", ".png", ".bmp")
 
 
 def resolve_layout(data):
-    """返回 (图片目录, 标签目录)"""
+    """返回 (图片目录, 标签目录)，自动探测 X-AnyLabeling 的各种导出布局"""
     img_sub = os.path.join(data, "images")
     lbl_sub = os.path.join(data, "labels")
-    if os.path.isdir(img_sub) and os.path.isdir(lbl_sub):
+    has_images = os.path.isdir(img_sub)
+    has_labels = os.path.isdir(lbl_sub)
+    if has_images and has_labels:      # images/ + labels/ 标准分离布局
         return img_sub, lbl_sub
-    return data, data
+    if has_labels:                     # 只导出了标签，图片仍在根目录
+        return data, lbl_sub
+    if has_images:                     # 只复制了图片，标签在根目录
+        return img_sub, data
+    return data, data                  # 图片与 txt 全混在根目录
 
 
 def main():
@@ -39,8 +45,10 @@ def main():
 
     imgs = {os.path.splitext(f)[0]: f for f in os.listdir(img_dir)
             if f.lower().endswith(IMG_EXT)}
+    # classes.txt / sources.txt 不是标注标签，必须排除，否则会误报"孤儿标签"和非法行
+    skip = {"sources.txt", "classes.txt"}
     txts = {os.path.splitext(f)[0]: f for f in os.listdir(lbl_dir)
-            if f.lower().endswith(".txt") and f.lower() != "sources.txt"}
+            if f.lower().endswith(".txt") and f.lower() not in skip}
 
     # 读取类别文件（YOLO 导出通常会生成，决定 class_id 顺序）
     classes = []
