@@ -50,4 +50,7 @@ class IoUTracker:
                 self.next_id += 1
 
         self.tracks = [t for t in self.tracks if t["miss"] <= self.max_miss]
-        return self.tracks
+        # 只把「本帧成功匹配」的活跃轨迹交给下游。miss>0 的是暂留用于后续
+        # 重匹配的旧轨迹，其 bbox 保持不变；若一并返回，计数器和标定工具会
+        # 把这些静止旧框当成车辆，既虚增每帧框数，也把连续帧位移中位压成 0。
+        return [t for t in self.tracks if t["miss"] == 0]

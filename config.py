@@ -25,8 +25,9 @@ YOLO_ONNX = os.path.join(PROJECT_DIR, "models", "car_yolo.onnx")
 CONF_THRES = float(os.environ.get("CAMPUS_CONF", "0.25"))
 IOU_THRES = 0.45    # NMS IoU 阈值
 
-# 竖屏长条画面分块推理（显著提升远景小车召回，无需重训模型）
-# auto = 竖屏自动启用 / 1 = 强制启用 / 0 = 关闭
+# 分块推理（显著提升远景小车召回，无需重训模型）
+# auto = 按长边一维切块(默认，快) / grid = 二维网格(远景小车召回最高，推理约3倍耗时)
+# 1 = 强制一维切块 / 0 = 整图不切块
 TILE_MODE = os.environ.get("CAMPUS_TILE", "auto")
 TILE_SIZE = 640
 TILE_OVERLAP = 0.4

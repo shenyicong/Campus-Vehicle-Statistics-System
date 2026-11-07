@@ -33,8 +33,9 @@ def main():
     ap.add_argument("--save-frames", type=int, default=12, help="保存多少张带框可视化帧")
     ap.add_argument("--conf", type=float, default=config.CONF_THRES)
     ap.add_argument("--iou", type=float, default=config.IOU_THRES)
-    ap.add_argument("--tile", default="auto", choices=["auto", "1", "0"],
-                    help="分块推理: auto=竖屏自动 / 1=强制 / 0=关闭(整图)")
+    ap.add_argument("--tile", default="auto", choices=["auto", "grid", "1", "0"],
+                    help="分块推理: auto=按长边一维切块 / grid=二维网格(远景召回最高,慢约3倍)"
+                         " / 1=强制一维 / 0=整图")
     args = ap.parse_args()
 
     if not os.path.exists(args.video):

@@ -41,7 +41,15 @@ campus_vehicle_system/
 ├── tools/
 │   ├── split_dataset.py       # 8:2 切分 + 生成 data.yaml
 │   ├── validate_yolo_export.py# 导出结果校验（配对/class_id/坐标）
-│   └── fix_rotation_labels.py # 修复 YOLO HBB 导出跳过旋转框导致空标签
+│   ├── fix_rotation_labels.py # 修复 YOLO HBB 导出跳过旋转框导致空标签
+│   ├── eval_real_video.py     # 真实视频抽样检测评估（检出/置信度/框面积分档）
+│   ├── eval_count_video.py    # 固定机位视频端到端：检测+计数+报表+演示图（一次推理）
+│   ├── calibrate_line.py      # 虚拟线标定 + 车流是否静止判定
+│   └── plot_training_curves.py# 训练曲线四宫格图
+├── docs/
+│   ├── real_video_eval.md     # 真实视频泛化评估记录
+│   ├── line_calibration.md    # 虚拟线标定与假跨线抑制
+│   └── training_curves.png    # 训练曲线
 ├── cloud_setup_yolo26_env.sh  # 兜底：从零重建 ROCm 训练环境
 ├── models/.gitkeep            # 放 car_yolo.onnx（模型文件不入库）
 ├── data/
@@ -100,7 +108,7 @@ python web_dashboard.py
 | `YOLO_ONNX` | ONNX 模型路径（默认 `models/car_yolo.onnx`） |
 | `CONF_THRES` / `IOU_THRES` | 置信度阈值 / NMS IoU 阈值；`CONF_THRES` 可用 `CAMPUS_CONF` 覆盖 |
 | `TEST_VIDEO` / `USE_RTSP` / `RTSP_URL` | 视频源：本地文件（可用 `CAMPUS_VIDEO` 覆盖）或 RTSP 实时流 |
-| `TILE_MODE` / `TILE_SIZE` / `TILE_OVERLAP` | 按画面**长边**自适应分块（竖屏切横块 / 宽幅横屏切竖块 / 近方形不切）：`auto` / `1` / `0`，可用 `CAMPUS_TILE` 覆盖 |
+| `TILE_MODE` / `TILE_SIZE` / `TILE_OVERLAP` | 分块推理：`auto` 按画面**长边**一维切块（竖屏切横块 / 宽幅横屏切竖块 / 近方形不切，默认）；`grid` 横纵都切 640×640 网格，远景小车召回最高但推理约 3 倍耗时；`1` 强制一维 / `0` 整图。可用 `CAMPUS_TILE` 覆盖 |
 | `LINE_Y` | 进出判定虚拟线（归一化 y，0=顶 1=底）；换视频后用 `tools/calibrate_line.py` 标定，可用 `CAMPUS_LINE_Y` 覆盖 |
 | `ENTER_WHEN` | 穿越方向：`down`=向下为进校 |
 | `MIN_TRACK_MOVE` | 抑制框抖动假跨线的最小净位移（默认 0.03），可用 `CAMPUS_MIN_MOVE` 覆盖 |
@@ -116,15 +124,25 @@ python web_dashboard.py
 
 ## 真实场景评估
 
-六段真实素材的评估数据、对比图与结论见 [`docs/real_video_eval.md`](docs/real_video_eval.md)，虚拟线标定见 [`docs/line_calibration.md`](docs/line_calibration.md)，训练曲线见 [`docs/training_curves.png`](docs/training_curves.png)。
+七段真实素材的评估数据、对比图与结论见 [`docs/real_video_eval.md`](docs/real_video_eval.md)，虚拟线标定见 [`docs/line_calibration.md`](docs/line_calibration.md)，训练曲线见 [`docs/training_curves.png`](docs/training_curves.png)，带框带线演示图见 [`docs/real_video_demo.jpg`](docs/real_video_demo.jpg)。
 
 - 夜间行车记录仪视频：框住的都是真车但漏检明显，平均置信度由同域 0.848 降到 0.535。
 - 白天固定机位俯拍竖屏视频：**首因是尺度压缩**——1080×1920 整图 letterbox 到 640×640 后有效宽度只剩约 360px，远景小车缩没；分块后检出框 **125 → 623**、零检出帧 **39.3% → 0%**，无需重训。
 - 火电厂街拍视频：`truck` 100 框 (0.684)、`bus` 6 框 (0.760)，整车可见时分类正确 → 前两段 `truck/bus≈0` 是画面里没有这两类车，不是模型不会认；大字水印 / 招牌从未误检。
 - **分块方向修正**：`TiledYoloOnnxDetector` 改为按画面**长边**自适应（竖屏切横块、宽幅横屏切竖块、近方形不切）。1280×720 横屏密集车流检出框 **312 → 899**、零检出 **36.1% → 14.8%**；竖屏与合成横屏回归均无退化。
-- **虚拟线标定与假过车抑制**：`tools/calibrate_line.py` 发现俯拍画面车辆 cy 常全在 0.59 以上，默认 `LINE_Y=0.5` 落在空白区导致计数恒为 0；静止车流的框抖动还会制造假过车，已加 `MIN_TRACK_MOVE` 抑制（**20 次假过车 → 1 次**，真实过车不受影响）。
-- **结论**：类别能力基本够用，补数据优先级下调；唯一确认短板是俯拍远景客车。六段现有素材都不满足「固定机位 + 镜头不动 + 车流持续移动」，进出计数演示仍需补拍一段校门视频。
-- 工具：`eval_real_video.py`（检出统计 + 框面积分档 + 带框帧）、`calibrate_line.py`（虚拟线标定 + 车流是否静止判定）。
+- **二维网格分块**：新增 `CAMPUS_TILE=grid`，横纵都切 640×640（缩放≈1）。俯拍远景 2 帧探针：整图 14 → 一维 24 → **网格 41** 框，新增框全是真车、无误检；代价约 3 倍推理时间，默认仍为 `auto`。
+- **跟踪器修复**：`IoUTracker` 只返回本帧活跃轨迹，消除僵尸轨迹造成的「运动车流被误判静止」与重复计数（合成视频 进 31 / 出 10 → **进 2 / 出 2** 真值）；重庆内环视频标定每帧 36.6 → 13.4 框、`|dy|` 中位 0 → 0.0042。
+- **虚拟线标定与假过车抑制**：`tools/calibrate_line.py` 发现俯拍画面车辆 cy 常全在 0.59 以上，默认 `LINE_Y=0.5` 落在空白区导致计数恒为 0；静止车流框抖动会制造假过车，`MIN_TRACK_MOVE` 抑制后安宁区视频复测 **11 进 / 9 出 → 1 进 / 0 出**。
+- **端到端计数演示已完成**：重庆内环高速俯拍（1080×1920 / 12.1s）是首个满足「固定机位 + 无剪辑 + 车流持续移动」的素材。全片 363 帧 `grid` 推理：**7096 框 / 每帧 19.55 / 零检出 0% / 平均置信度 0.608**，四类车全部检出；`LINE_Y=0.65` 计数 **进 54 / 出 18**（轿车 43/14、SUV 4/1、货车 4/3、客车 3/0），hourly/daily CSV、Excel 报表与演示图均已产出。
+- **限制**：远景小车仍漏检约一半；单横线用于高速双向车流只是链路演示，不是真实校门通行量真值；12 秒片段只有 1 个小时桶；计数未经人工逐帧核验。补 50–100 张俯拍远景样本微调、换 ByteTrack 与分车道双向虚拟线是后续重点。
+- 工具：`eval_real_video.py`（抽样检测评估 + 框面积分档）、`calibrate_line.py`（虚拟线标定 + 静止判定）、`eval_count_video.py`（固定机位视频一次推理产出检测统计 + 计数 + 报表 + 演示图）。
+
+一键复现（换成自己的固定机位视频，先标定再端到端）：
+
+```bash
+python tools/calibrate_line.py --video "D:/path/to.mp4" --frames 240
+python tools/eval_count_video.py --video "D:/path/to.mp4" --tile grid --line-y 0.65 --out data/real_eval_demo
+```
 
 ## 云端训练流程
 
