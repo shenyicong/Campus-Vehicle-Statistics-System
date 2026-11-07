@@ -24,7 +24,12 @@ CLASSES=${CLASSES:-"轿车,SUV,货车,客车"}
 echo "========== [0/4] 环境自检 =========="
 if [ ! -x "$PY" ]; then
   echo "!! venv 缺失，执行恢复脚本 ..."
-  bash "$ROOT/setup_yolo26_env.sh"
+  if [ -f "$ROOT/tools/setup_yolo26_env.sh" ]; then
+    bash "$ROOT/tools/setup_yolo26_env.sh"
+  else
+    echo "!! 找不到 /workspace/tools/setup_yolo26_env.sh，请先在本机运行 cloud/upload_dataset.sh"
+    exit 1
+  fi
 fi
 "$PY" - <<'PY'
 import torch, ultralytics

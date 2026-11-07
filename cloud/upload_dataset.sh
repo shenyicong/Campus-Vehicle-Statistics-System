@@ -27,6 +27,7 @@ ssh "$REMOTE" "mkdir -p $RDIR /workspace/tools /workspace/datasets /workspace/ru
 scp "$TARBALL" "$REMOTE:/workspace/data/car_dataset.tar.gz"
 scp "$REPO/tools/split_dataset.py" "$REMOTE:/workspace/tools/split_dataset.py"
 scp "$REPO/cloud/train_car_yolo.sh" "$REMOTE:/workspace/tools/train_car_yolo.sh"
+scp "$REPO/cloud_setup_yolo26_env.sh" "$REMOTE:/workspace/tools/setup_yolo26_env.sh"
 
 echo "========== [3/4] 远端解压 =========="
 ssh "$REMOTE" "tar -xzf /workspace/data/car_dataset.tar.gz -C $RDIR && rm -f /workspace/data/car_dataset.tar.gz && sed -i 's/\r\$//' /workspace/tools/*.sh /workspace/tools/*.py && chmod +x /workspace/tools/train_car_yolo.sh"
