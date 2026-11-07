@@ -131,3 +131,67 @@ class YoloOnnxDetector(Detector):
                 out.append([int(x1[i]), int(y1[i]), int(x2[i]), int(y2[i]),
                             c, float(confs[i])])
         return out
+
+
+class TiledYoloOnnxDetector(YoloOnnxDetector):
+    """竖屏长条画面的分块推理：解决 letterbox 压缩导致远景小车漏检。
+
+    1080x1920 竖屏整图送进 640x640 模型时，等比缩放后有效宽度只剩约 360px，
+    远处小车会缩到几像素而漏检。本类沿高度切成若干 w x tile_size 的重叠横块，
+    逐块调用父类 detect，坐标平移回原图后按类别再做一次 NMS 合并。
+    实测同一帧检出数可由 0~1 提升到 6~11，且不需要重新训练模型。
+
+    仅对「明显竖长」的画面自动启用；横屏切块反而会加重压缩，所以 auto
+    模式下横屏/近方形画面直接退化为整图推理。
+    """
+    def __init__(self, onnx_path, classes, conf=0.25, iou=0.45,
+                 mode="auto", tile_size=640, overlap=0.4, min_ratio=1.4):
+        super().__init__(onnx_path, classes, conf=conf, iou=iou)
+        self.mode = mode              # auto / 1 / 0
+        self.tile_size = int(tile_size)
+        self.overlap = float(overlap)
+        self.min_ratio = float(min_ratio)
+
+    def detect(self, frame):
+        if frame is None or frame.size == 0:
+            return []
+        h, w = frame.shape[:2]
+        if self.mode == "0":
+            return super().detect(frame)
+        if self.mode != "1" and h < w * self.min_ratio:
+            return super().detect(frame)
+
+        ts = min(self.tile_size, h)
+        step = max(1, int(ts * (1 - self.overlap)))
+        starts = list(range(0, max(0, h - ts) + 1, step))
+        if not starts or starts[-1] != h - ts:
+            starts.append(h - ts)
+        starts = sorted(set(s for s in starts if 0 <= s <= h - ts))
+
+        raw = []
+        for y0 in starts:
+            for b in super().detect(frame[y0:y0 + ts, 0:w]):
+                b = list(b)
+                b[1] += y0
+                b[3] += y0
+                raw.append(b)
+        return self._merge_nms(raw)
+
+    def _merge_nms(self, boxes):
+        if not boxes:
+            return []
+        cv2, np = self.cv2, self.np
+        out = []
+        for c in range(len(self.classes)):
+            group = [b for b in boxes if int(b[4]) == c]
+            if not group:
+                continue
+            rects = [[float(b[0]), float(b[1]),
+                      float(b[2] - b[0]), float(b[3] - b[1])] for b in group]
+            scores = [float(b[5]) for b in group]
+            keep = cv2.dnn.NMSBoxes(rects, scores, 0.0, self.iou)
+            if keep is None or len(keep) == 0:
+                continue
+            for j in np.array(keep).reshape(-1):
+                out.append(group[int(j)])
+        return out

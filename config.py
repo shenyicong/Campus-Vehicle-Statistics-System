@@ -4,7 +4,8 @@ import os
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR    = os.path.join(PROJECT_DIR, "data")
 REPORT_DIR  = os.path.join(DATA_DIR, "reports")
-TEST_VIDEO  = os.path.join(DATA_DIR, "test_monitor.mp4")
+# 可用 set CAMPUS_VIDEO=D:\path\to.mp4 临时切换视频源，无需改代码
+TEST_VIDEO  = os.environ.get("CAMPUS_VIDEO", os.path.join(DATA_DIR, "test_monitor.mp4"))
 # 合成测试视频用的车型图片源：可用环境变量 CAMPUS_CAR_DIR 覆盖，默认 D:\car
 SOURCE_DIR  = os.environ.get("CAMPUS_CAR_DIR", r"D:\car")
 
@@ -23,6 +24,12 @@ YOLO_ONNX = os.path.join(PROJECT_DIR, "models", "car_yolo.onnx")
 # 检测置信度阈值；真实场景漏检多时可临时下调: set CAMPUS_CONF=0.15
 CONF_THRES = float(os.environ.get("CAMPUS_CONF", "0.25"))
 IOU_THRES = 0.45    # NMS IoU 阈值
+
+# 竖屏长条画面分块推理（显著提升远景小车召回，无需重训模型）
+# auto = 竖屏自动启用 / 1 = 强制启用 / 0 = 关闭
+TILE_MODE = os.environ.get("CAMPUS_TILE", "auto")
+TILE_SIZE = 640
+TILE_OVERLAP = 0.4
 
 # 进出判定虚拟线（归一化 y，0=顶部 1=底部）
 LINE_Y = 0.5

@@ -98,8 +98,9 @@ python web_dashboard.py
 | `CLASSES` | 类别列表，顺序即模型输出类别顺序，须与标注 / 训练一致 |
 | `DETECTOR` | `yolo_onnx` 真实模型（默认）/ `mock` 模拟检测；可用环境变量 `CAMPUS_DETECTOR` 覆盖 |
 | `YOLO_ONNX` | ONNX 模型路径（默认 `models/car_yolo.onnx`） |
-| `CONF_THRES` / `IOU_THRES` | 置信度阈值 / NMS IoU 阈值 |
-| `USE_RTSP` / `RTSP_URL` | 视频源切换：本地文件 或 RTSP 实时流 |
+| `CONF_THRES` / `IOU_THRES` | 置信度阈值 / NMS IoU 阈值；`CONF_THRES` 可用 `CAMPUS_CONF` 覆盖 |
+| `TEST_VIDEO` / `USE_RTSP` / `RTSP_URL` | 视频源：本地文件（可用 `CAMPUS_VIDEO` 覆盖）或 RTSP 实时流 |
+| `TILE_MODE` / `TILE_SIZE` / `TILE_OVERLAP` | 竖屏长条画面分块推理：`auto` 自动 / `1` 强制 / `0` 关闭，可用 `CAMPUS_TILE` 覆盖 |
 | `LINE_Y` | 进出判定虚拟线（归一化 y，0=顶 1=底） |
 | `ENTER_WHEN` | 穿越方向：`down`=向下为进校 |
 | `WEB_HOST` / `WEB_PORT` | 看板监听地址 / 端口（默认 127.0.0.1:5000） |
@@ -111,6 +112,16 @@ python web_dashboard.py
 - **配置**：YOLO11n 预训练权重，100 epoch，imgsz 640，batch 16
 - **指标**：`mAP50 = 0.799`、`mAP50-95 = 0.569`、精确率 `0.725`、召回率 `0.788`
 - **类别顺序**：`0 轿车 / 1 SUV / 2 货车 / 3 客车`，与 `CLASSES = sedan/suv/truck/bus` 一一对齐
+
+## 真实场景评估
+
+两段真实视频的评估数据、对比图与结论见 [`docs/real_video_eval.md`](docs/real_video_eval.md)，训练曲线见 [`docs/training_curves.png`](docs/training_curves.png)。
+
+- 夜间行车记录仪视频：框住的都是真车但漏检明显，平均置信度由同域 0.848 降到 0.535。
+- 白天固定机位俯拍竖屏视频：**首因是尺度压缩**——1080×1920 整图 letterbox 到 640×640 后有效宽度只剩约 360px，远景小车缩没。
+- 为此实现 `TiledYoloOnnxDetector`（竖屏自动分块，横屏退化为整图）。同一视频同一阈值下：检出框 **125 → 623**、零检出帧 **39.3% → 0%**、平均置信度 **0.497 → 0.588**，未引入误检，**无需重训模型**。
+- 仍待补数据：客车（蓝色大巴未认出）、极远景小车、夜间与车尾视角。
+- 工具：`python tools/eval_real_video.py --video <路径>` 可对任意本地视频输出检出统计与带框可视化帧。
 
 ## 云端训练流程
 

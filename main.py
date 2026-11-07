@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
 from video_input import open_source
-from detector import ScenarioMockDetector, YoloOnnxDetector
+from detector import ScenarioMockDetector, TiledYoloOnnxDetector
 from tracker import IoUTracker
 from counter import Counter
 from reporter import Reporter
@@ -16,7 +16,12 @@ from reporter import Reporter
 
 def build_detector(w, h):
     if config.DETECTOR == "yolo_onnx":
-        return YoloOnnxDetector(config.YOLO_ONNX, config.CLASSES)
+        # 分块推理（竖屏自动启用）；同时把 config 的阈值真正传给检测器
+        return TiledYoloOnnxDetector(
+            config.YOLO_ONNX, config.CLASSES,
+            conf=config.CONF_THRES, iou=config.IOU_THRES,
+            mode=config.TILE_MODE, tile_size=config.TILE_SIZE,
+            overlap=config.TILE_OVERLAP)
     return ScenarioMockDetector(w, h, config.CLASSES)
 
 

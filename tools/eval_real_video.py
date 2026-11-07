@@ -20,7 +20,7 @@ import cv2
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_DIR)
 import config
-from detector import YoloOnnxDetector
+from detector import TiledYoloOnnxDetector
 
 
 def main():
@@ -33,6 +33,8 @@ def main():
     ap.add_argument("--save-frames", type=int, default=12, help="保存多少张带框可视化帧")
     ap.add_argument("--conf", type=float, default=config.CONF_THRES)
     ap.add_argument("--iou", type=float, default=config.IOU_THRES)
+    ap.add_argument("--tile", default="auto", choices=["auto", "1", "0"],
+                    help="分块推理: auto=竖屏自动 / 1=强制 / 0=关闭(整图)")
     args = ap.parse_args()
 
     if not os.path.exists(args.video):
@@ -44,8 +46,8 @@ def main():
     frame_dir = os.path.join(args.out, "frames")
     os.makedirs(frame_dir, exist_ok=True)
 
-    det = YoloOnnxDetector(config.YOLO_ONNX, config.CLASSES,
-                           conf=args.conf, iou=args.iou)
+    det = TiledYoloOnnxDetector(config.YOLO_ONNX, config.CLASSES,
+                                conf=args.conf, iou=args.iou, mode=args.tile)
     cap = cv2.VideoCapture(args.video)
     if not cap.isOpened():
         raise SystemExit("无法打开视频: " + args.video)
@@ -115,6 +117,7 @@ def main():
         "抽样      : %d 帧（每 %d 帧取 1 帧）" % (samples, args.every),
         "模型      : %s" % os.path.basename(config.YOLO_ONNX),
         "置信度阈值: %.2f   NMS IoU: %.2f" % (args.conf, args.iou),
+        "分块推理  : %s" % args.tile,
         "",
         "--- 总体 ---",
         "检出框总数      : %d" % total_boxes,
@@ -145,7 +148,7 @@ def main():
         "video": args.video, "width": w, "height": h, "fps": fps,
         "total_frames": total, "duration_sec": round(duration, 1),
         "sampled_frames": samples, "sample_every": args.every,
-        "conf": args.conf, "iou": args.iou,
+        "conf": args.conf, "iou": args.iou, "tile": args.tile,
         "total_boxes": total_boxes, "avg_boxes_per_frame": round(total_boxes / n, 3),
         "zero_detect_frames": zero_frames, "avg_conf": round(avg_conf, 4),
         "median_conf": round(med_conf, 4), "avg_box_area_pct": round(avg_area, 2),
