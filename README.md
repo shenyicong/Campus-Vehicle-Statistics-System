@@ -14,7 +14,7 @@
 - **统计分析**：按小时 / 按日聚合，输出 CSV 与 Excel
 - **场地车位本地设置**：分区名 / 适用车型 / 实有车位数量由本地人员录入，可改 JSON 或直接在看板表单增删分区并保存，系统不写死场地（[`docs/parking_plan.md`](docs/parking_plan.md)）
 - **车位供需对比**：由分车型进出量推算分区峰值在场数 → 需求泊位，与实有车位对比得出余量、缺口、饱和度、状态，并输出大 / 小车位配比与用地参考
-- **实时看板**：Flask + Chart.js，同屏展示进出统计、场地车位设置表单与供需对比，5 秒刷新（自动刷新不打断正在编辑的表单）
+- **数据驾驶舱看板**：深 / 浅双主题、纯 SVG 自绘图表（零外部依赖、离线可用），含 6 张 KPI 卡、分车型进出柱图、车型结构环图、24 小时热力、停车供需环与分区饱和度、逐时段明细；悬浮可看数值，5 秒刷新且不会打断表单编辑
 - **可复现训练**：AMD Radeon Cloud / ROCm 一键脚本（上传 → 切分 → 训练 → 导出 ONNX）
 
 ## 系统架构
@@ -38,7 +38,7 @@ campus_vehicle_system/
 ├── parking_plan.py            # 场地车位配置读写 + 需求推导 + 供需对比（脚本与看板共用）
 ├── main.py                    # 端到端串联入口
 ├── make_test_video.py         # 用车型图片合成模拟校门监控测试视频
-├── web_dashboard.py           # Flask + Chart.js 实时看板 + 场地车位设置表单（端口 5000）
+├── web_dashboard.py           # Flask 数据驾驶舱：双主题 + 纯 SVG 图表 + 场地车位设置（端口 5000）
 ├── cloud/
 │   ├── upload_dataset.sh      # 本机：打包上传数据集与云端脚本
 │   ├── train_car_yolo.sh      # 云端：自检 → 切分 → 训练 → 导出 ONNX
@@ -53,7 +53,8 @@ campus_vehicle_system/
 │   ├── eval_count_video.py    # 固定机位视频端到端：检测+计数+报表+演示图（一次推理）
 │   ├── calibrate_line.py      # 虚拟线标定 + 车流是否静止判定
 │   ├── plan_parking.py        # 输出供需分析报告（md / csv / xlsx，含 --init-zones）
-│   └── plot_training_curves.py# 训练曲线四宫格图
+│   ├── plot_training_curves.py# 训练曲线四宫格图
+│   └── make_dashboard_snapshot.py # 生成零依赖静态看板预览（数据内联，无需启动服务）
 ├── docs/
 │   ├── real_video_eval.md     # 真实视频泛化评估记录
 │   ├── line_calibration.md    # 虚拟线标定与假跨线抑制
@@ -110,11 +111,23 @@ python web_dashboard.py
 # 浏览器打开 http://127.0.0.1:5000
 ```
 
+不想启动服务时，可直接生成一份数据已内联的静态快照，双击 HTML 即可预览：
+
+```bash
+python tools/make_dashboard_snapshot.py
+# 输出 data/reports/dashboard_preview.html（只读；保存场地配置需启动服务）
+```
+
+看板为深 / 浅双主题（右上角切换、自动记忆），图表全部由 SVG 自绘，
+**不依赖 Chart.js 或任何 CDN**，离线可用。包含：6 张 KPI 卡、分车型进出分组柱图、
+车型结构环图、24 小时通行热力、停车供需环、分区供需卡、逐时段明细表与规划提示；
+柱图 / 热力格 / 环图均支持悬浮查看数值。
+
 ### 5. 设置本场地的车位（本地人员操作）
 
 两种方式写的是同一个文件 `data/parking_zones.json`：
 
-1. **看板表单（推荐）**：打开 `http://127.0.0.1:5000` →「场地车位设置」→
+1. **看板抽屉（推荐）**：打开 `http://127.0.0.1:5000` → 右上角「场地车位设置」→
    改场地名称、分区名、勾选适用车型、填写实有车位数量 → 点「保存场地配置」。
    支持「+ 添加分区」「删除」「放弃修改」；5 秒自动刷新不会打断正在编辑的表单。
 2. **文本编辑**：直接改 `data/parking_zones.json`，或先运行
@@ -200,7 +213,8 @@ python tools/eval_count_video.py --video "D:/path/to.mp4" --tile grid --line-y 0
 python tools/plan_parking.py                      # 默认读 data/reports/hourly.csv 与场地配置
 python tools/plan_parking.py --hourly <某次评估>/reports/hourly.csv --out-dir <输出目录>
 python tools/plan_parking.py --init-zones         # 生成场地配置模板给本地人员填写
-python web_dashboard.py                           # 看板同屏展示统计、场地设置表单与供需对比
+python web_dashboard.py                           # 数据驾驶舱：统计图表 + 场地设置 + 供需对比
+python tools/make_dashboard_snapshot.py           # 无需启动服务的静态预览快照
 ```
 
 以重庆内环高速俯拍真实视频的报表 + 校园默认场地配置为例
