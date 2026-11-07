@@ -7,10 +7,11 @@
 # =============================================================
 set -euo pipefail
 
+# 注意：scp 把含冒号的参数当成 "主机:路径"，所以这里必须用 Git Bash 的 POSIX 路径 /d/...
 REMOTE=${REMOTE:-radeon-cloud}
-SRC=${SRC:-D:/car_export}
-REPO=${REPO:-D:/YOLO/campus_vehicle_system}
-TARBALL=D:/car_dataset.tar.gz
+SRC=${SRC:-/d/car_export}
+REPO=${REPO:-/d/YOLO/campus_vehicle_system}
+TARBALL=/d/car_dataset.tar.gz
 RDIR=/workspace/data/car
 
 echo "========== [0/4] 检查云端连通 =========="
@@ -33,7 +34,7 @@ echo "========== [3/4] 远端解压 =========="
 ssh "$REMOTE" "tar -xzf /workspace/data/car_dataset.tar.gz -C $RDIR && rm -f /workspace/data/car_dataset.tar.gz && sed -i 's/\r\$//' /workspace/tools/*.sh /workspace/tools/*.py && chmod +x /workspace/tools/train_car_yolo.sh"
 
 echo "========== [4/4] 核对 =========="
-ssh "$REMOTE" "cd $RDIR && echo jpg=\$(ls *.jpg 2>/dev/null | wc -l) txt=\$(ls *.txt 2>/dev/null | wc -l) && echo '--- classes.txt ---' && cat classes.txt && echo '--- 环境 ---' && /workspace/.venv-yolo26/bin/python -c 'import torch;print(torch.__version__, torch.cuda.is_available())' 2>&1 | tail -1"
+ssh "$REMOTE" "cd $RDIR && echo jpg=\$(ls *.jpg 2>/dev/null | wc -l) txt=\$(ls *.txt 2>/dev/null | wc -l) && echo '--- classes.txt ---' && cat classes.txt && echo '--- 环境(可能仍在安装) ---' && (/workspace/.venv-yolo26/bin/python -c 'import torch;print(torch.__version__, torch.cuda.is_available())' 2>&1 | tail -1 || echo '(环境安装中)')"
 
 echo "========== 完成 =========="
 echo "训练： ssh $REMOTE 'bash /workspace/tools/train_car_yolo.sh'"

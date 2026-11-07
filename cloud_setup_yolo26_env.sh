@@ -16,6 +16,9 @@ set -e
 UV=/opt/venv/bin/uv
 VENV=/workspace/.venv-yolo26
 REPO=/workspace/yolo26-rocm-day1-labs
+# 云端访问 pypi.org 很慢（实测 6.7s/请求），会把 uv 卡在元数据解析；默认改用阿里云镜像（0.08s）
+# 需要换源时： PYPI_INDEX_URL=https://pypi.org/simple/ bash /workspace/tools/setup_yolo26_env.sh
+PYPI_INDEX_URL=${PYPI_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
 
 echo "[0/4] 探测系统 ROCm 与 GPU"
 SYS_ROCM=$(cat /opt/rocm/.info/version 2>/dev/null || echo unknown)
@@ -55,7 +58,7 @@ if ! "$VENV/bin/python" -c "import torch, ultralytics" 2>/dev/null; then
   [ -f "$REPO/requirements-course.txt" ] && EXTRA="-r $REPO/requirements-course.txt"
   $UV pip install --python "$VENV" \
     --index-url "$INDEX_URL" \
-    --extra-index-url "https://pypi.org/simple/" \
+    --extra-index-url "$PYPI_INDEX_URL" \
     --index-strategy unsafe-best-match \
     "$TORCH_SPEC" "$TV_SPEC" \
     ultralytics ipykernel onnx $EXTRA
