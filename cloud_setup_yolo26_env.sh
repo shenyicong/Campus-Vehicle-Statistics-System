@@ -68,11 +68,8 @@ echo "[3/4] 注册 Jupyter 内核"
   --name yolo26-rocm7141 --display-name "YOLO26 - AMD ROCm 7.14.1"
 
 echo "[4/4] GPU 自检 (nms)"
-"$VENV/bin/python" - <<'PY' || {
-  echo "!! GPU 自检失败：大概率是 torch wheel 与系统 ROCm 版本不匹配。"
-  echo "   用 ROCM_TAG=<系统实际版本> 或 TORCH_INDEX_URL=... 重跑本脚本。"
-  exit 1
-}
+set +e
+"$VENV/bin/python" - <<'PY'
 import torch
 from torchvision.ops import nms
 assert torch.cuda.is_available(), "torch.cuda 不可用"
@@ -83,5 +80,12 @@ print("  GPU     :", torch.cuda.get_device_name(0))
 print("  nms     :", nms(b, s, 0.5).tolist())
 print("  NMS_OK")
 PY
+RC=$?
+set -e
+if [ "$RC" -ne 0 ]; then
+  echo "!! GPU 自检失败：大概率是 torch wheel 与系统 ROCm 版本不匹配。"
+  echo "   用 ROCM_TAG=<系统实际版本> 或 TORCH_INDEX_URL=... 重跑本脚本。"
+  exit 1
+fi
 
 echo "DONE. 环境可用，接下来：上传数据集 -> 切分 -> 训练 -> 导出 ONNX"
