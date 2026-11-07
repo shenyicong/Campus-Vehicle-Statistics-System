@@ -3,12 +3,18 @@
 """YOLO 导出结果校验（训练前必跑，零第三方依赖）
 
 用法:
-  python validate_yolo_export.py --data D:/car
-  python validate_yolo_export.py --data D:/car --gen-yaml D:/car/data.yaml
+  python validate_yolo_export.py --data D:/car_export
+  python validate_yolo_export.py --data D:/car_export --json-dir D:/car --gen-yaml D:/car_export/data.yaml
 
-自动兼容两种导出布局:
-  1) 图片与 txt 同目录:   D:/car/xxx.jpg  + D:/car/xxx.txt
-  2) images/labels 分离:   D:/car/images/xxx.jpg + D:/car/labels/xxx.txt
+说明:
+  --data      导出目录（X-AnyLabeling 的 export root，不能是图片目录本身）
+  --json-dir  原始标注 json 所在目录（默认 D:\\car），交叉核对 class_id 顺序时用它
+
+自动兼容四种导出布局:
+  1) 图片与 txt 同目录:   xxx.jpg + xxx.txt
+  2) images/ + labels/ 分离
+  3) 只有 labels/（图片留在源目录）
+  4) 只有 images/（标签在根目录）
 """
 import argparse
 import json
@@ -36,7 +42,8 @@ def resolve_layout(data):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", default=r"D:\car", help="YOLO 导出目录")
+    ap.add_argument("--data", default=r"D:\car_export", help="YOLO 导出目录（export root）")
+    ap.add_argument("--json-dir", default=r"D:\car", help="原始标注 json 目录，用于交叉核对 class_id 顺序")
     ap.add_argument("--gen-yaml", default="", help="可选：按 classes.txt 顺序生成 data.yaml 的路径")
     args = ap.parse_args()
 
@@ -98,14 +105,33 @@ def main():
         print("  %d: %-10s %d 个框" % (cid, name, per_cls[cid]))
     print("总框数:", sum(per_cls.values()))
 
-    # 交叉核对：JSON 里的中文标签 -> classes.txt 行号，必须与 txt 的 class_id 一致
+    # 检查导出软件有没有擅自改写 classes.txt 的顺序（必须与项目 config.CLASSES 对齐）
+    EXPECTED = ["轿车", "SUV", "货车", "客车"]  # = sedan / suv / truck / bus
+    order_bad = []
+    if not classes:
+        order_bad.append("未找到 classes.txt")
+    elif classes != EXPECTED:
+        order_bad.append("classes.txt 顺序=%s，期望=%s；软件可能覆盖了它" % (classes, EXPECTED))
+    print("\n=== 类别顺序检查 ===")
+    if order_bad:
+        print("  ❌ " + "; ".join(order_bad))
+    else:
+        print("  ✅ classes.txt = %s，与 config.CLASSES(sedan/suv/truck/bus) 对齐" % classes)
+
+    # 交叉核对：源目录 json 里的中文标签 -> classes.txt 行号，必须与 txt 的 class_id 一致
     # 这一步能抓出"导出时类别顺序被软件改乱"的隐蔽错误，否则训练出的模型会认错车
     map_bad, checked = [], 0
     if classes:
         label2id = {c: i for i, c in enumerate(classes)}
         for stem, fn in txts.items():
-            jp = os.path.join(args.data, stem + ".json")
-            if not os.path.exists(jp):
+            jp = None
+            for cand in (os.path.join(args.json_dir, stem + ".json"),
+                         os.path.join(args.data, stem + ".json"),
+                         os.path.join(img_dir, stem + ".json")):
+                if os.path.exists(cand):
+                    jp = cand
+                    break
+            if jp is None:
                 continue
             try:
                 with open(jp, encoding="utf-8-sig") as f:
@@ -125,11 +151,11 @@ def main():
                             pass
             if sorted(got) != want:
                 map_bad.append("%s(json=%s, txt=%s)" % (fn, want, sorted(got)))
-    print("\n=== 标签↔class_id 交叉核对（已比对 %d 张 json）===" % checked)
+    print("\n=== 标签↔class_id 交叉核对（已比对 %d 张源 json）===" % checked)
     if not classes:
         print("  跳过：无 classes.txt")
     elif checked == 0:
-        print("  警告：未找到可与 txt 配对的 json，无法核对顺序")
+        print("  警告：未找到可配对的源 json（用 --json-dir 指定标注目录，默认 D:\\car）")
     elif map_bad:
         print("  ❌ 不一致 %d 个（类别顺序可能乱了）: %s" % (len(map_bad), map_bad[:8]))
     else:
@@ -139,7 +165,7 @@ def main():
     print("空标签 %d %s" % (len(empty), empty[:10] if empty else ""))
     print("非法行 %d %s" % (len(bad), bad[:10] if bad else ""))
 
-    ok = not (missing or orphan or bad or map_bad)
+    ok = not (missing or orphan or bad or map_bad or order_bad)
     print("\n结论:", "OK 校验通过，可上传训练" if ok else "存在问题，请按上面修正")
 
     if args.gen_yaml and classes:
