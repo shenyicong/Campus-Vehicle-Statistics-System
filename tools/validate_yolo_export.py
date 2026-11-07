@@ -11,6 +11,7 @@
   2) images/labels 分离:   D:/car/images/xxx.jpg + D:/car/labels/xxx.txt
 """
 import argparse
+import json
 import os
 import sys
 from collections import Counter
@@ -97,11 +98,48 @@ def main():
         print("  %d: %-10s %d 个框" % (cid, name, per_cls[cid]))
     print("总框数:", sum(per_cls.values()))
 
+    # 交叉核对：JSON 里的中文标签 -> classes.txt 行号，必须与 txt 的 class_id 一致
+    # 这一步能抓出"导出时类别顺序被软件改乱"的隐蔽错误，否则训练出的模型会认错车
+    map_bad, checked = [], 0
+    if classes:
+        label2id = {c: i for i, c in enumerate(classes)}
+        for stem, fn in txts.items():
+            jp = os.path.join(args.data, stem + ".json")
+            if not os.path.exists(jp):
+                continue
+            try:
+                with open(jp, encoding="utf-8-sig") as f:
+                    shapes = json.load(f).get("shapes", [])
+            except (ValueError, OSError):
+                continue
+            checked += 1
+            want = sorted(label2id.get(s.get("label"), -1) for s in shapes)
+            got = []
+            with open(os.path.join(lbl_dir, fn), encoding="utf-8-sig") as f:
+                for ln in f:
+                    parts = ln.split()
+                    if parts:
+                        try:
+                            got.append(int(parts[0]))
+                        except ValueError:
+                            pass
+            if sorted(got) != want:
+                map_bad.append("%s(json=%s, txt=%s)" % (fn, want, sorted(got)))
+    print("\n=== 标签↔class_id 交叉核对（已比对 %d 张 json）===" % checked)
+    if not classes:
+        print("  跳过：无 classes.txt")
+    elif checked == 0:
+        print("  警告：未找到可与 txt 配对的 json，无法核对顺序")
+    elif map_bad:
+        print("  ❌ 不一致 %d 个（类别顺序可能乱了）: %s" % (len(map_bad), map_bad[:8]))
+    else:
+        print("  ✅ 全部一致，class_id 顺序与 classes.txt 对齐")
+
     print("\n=== 异常 ===")
     print("空标签 %d %s" % (len(empty), empty[:10] if empty else ""))
     print("非法行 %d %s" % (len(bad), bad[:10] if bad else ""))
 
-    ok = not (missing or orphan or bad)
+    ok = not (missing or orphan or bad or map_bad)
     print("\n结论:", "OK 校验通过，可上传训练" if ok else "存在问题，请按上面修正")
 
     if args.gen_yaml and classes:
