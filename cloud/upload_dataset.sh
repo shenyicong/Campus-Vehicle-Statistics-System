@@ -29,7 +29,7 @@ scp "$REPO/tools/split_dataset.py" "$REMOTE:/workspace/tools/split_dataset.py"
 scp "$REPO/cloud/train_car_yolo.sh" "$REMOTE:/workspace/tools/train_car_yolo.sh"
 
 echo "========== [3/4] 远端解压 =========="
-ssh "$REMOTE" "tar -xzf /workspace/data/car_dataset.tar.gz -C $RDIR && rm -f /workspace/data/car_dataset.tar.gz && chmod +x /workspace/tools/train_car_yolo.sh"
+ssh "$REMOTE" "tar -xzf /workspace/data/car_dataset.tar.gz -C $RDIR && rm -f /workspace/data/car_dataset.tar.gz && sed -i 's/\r\$//' /workspace/tools/*.sh /workspace/tools/*.py && chmod +x /workspace/tools/train_car_yolo.sh"
 
 echo "========== [4/4] 核对 =========="
 ssh "$REMOTE" "cd $RDIR && echo jpg=\$(ls *.jpg 2>/dev/null | wc -l) txt=\$(ls *.txt 2>/dev/null | wc -l) && echo '--- classes.txt ---' && cat classes.txt && echo '--- 环境 ---' && /workspace/.venv-yolo26/bin/python -c 'import torch;print(torch.__version__, torch.cuda.is_available())' 2>&1 | tail -1"
