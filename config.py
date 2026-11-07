@@ -20,7 +20,8 @@ CLASS_CN = {"sedan": "轿车", "suv": "SUV", "truck": "货车", "bus": "客车"}
 # 想跑模拟数据: set CAMPUS_DETECTOR=mock
 DETECTOR = os.environ.get("CAMPUS_DETECTOR", "yolo_onnx")
 YOLO_ONNX = os.path.join(PROJECT_DIR, "models", "car_yolo.onnx")
-CONF_THRES = 0.25   # 检测置信度阈值
+# 检测置信度阈值；真实场景漏检多时可临时下调: set CAMPUS_CONF=0.15
+CONF_THRES = float(os.environ.get("CAMPUS_CONF", "0.25"))
 IOU_THRES = 0.45    # NMS IoU 阈值
 
 # 进出判定虚拟线（归一化 y，0=顶部 1=底部）
