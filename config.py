@@ -47,6 +47,12 @@ MIN_TRACK_MOVE = float(os.environ.get("CAMPUS_MIN_MOVE", "0.03"))
 HOURLY_CSV = os.path.join(REPORT_DIR, "hourly.csv")
 DAILY_CSV  = os.path.join(REPORT_DIR, "daily.csv")
 
+# 场地车位配置：由本地人员按实际场地维护（分区名 / 服务车型 / 实有车位数）
+# 可在网页看板「场地车位设置」中编辑保存；也可用环境变量切换到别的场地文件
+# set CAMPUS_PARKING_ZONES=D:\path\to\my_zones.json
+PARKING_ZONES_JSON = os.environ.get(
+    "CAMPUS_PARKING_ZONES", os.path.join(DATA_DIR, "parking_zones.json"))
+
 # 网页仪表盘
 WEB_HOST = "127.0.0.1"
 WEB_PORT = 5000
