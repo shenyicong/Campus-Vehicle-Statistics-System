@@ -16,9 +16,12 @@ RTSP_URL = ""   # 例如 "rtsp://admin:pass@192.168.1.64:554/stream"
 CLASSES = ["sedan", "suv", "truck", "bus"]
 CLASS_CN = {"sedan": "轿车", "suv": "SUV", "truck": "货车", "bus": "客车"}
 
-# 检测器: "mock" 模拟检测(跑通全链路) / "yolo_onnx" 真实YOLO模型
-DETECTOR = "mock"
-YOLO_ONNX = os.path.join(DATA_DIR, "yolov8n.onnx")
+# 检测器: "yolo_onnx" 真实YOLO模型(默认) / "mock" 模拟检测(跑通全链路)
+# 想跑模拟数据: set CAMPUS_DETECTOR=mock
+DETECTOR = os.environ.get("CAMPUS_DETECTOR", "yolo_onnx")
+YOLO_ONNX = os.path.join(PROJECT_DIR, "models", "car_yolo.onnx")
+CONF_THRES = 0.25   # 检测置信度阈值
+IOU_THRES = 0.45    # NMS IoU 阈值
 
 # 进出判定虚拟线（归一化 y，0=顶部 1=底部）
 LINE_Y = 0.5

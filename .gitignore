@@ -9,9 +9,13 @@ env/
 # 数据与模型产物（运行时生成，不入库）
 data/*.mp4
 data/reports/
+models/*
+!models/.gitkeep
 *.onnx
 *.pt
 *.pth
+*.csv
+!tools/*.csv
 
 # 系统 / IDE
 .DS_Store
