@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问题 / 配置咨询
+    url: https://github.com/shenyicong/Campus-Vehicle-Statistics-System/discussions
+    about: 部署、标定、报表与配置类问题请先到 Discussions 讨论
+  - name: 安全漏洞（请勿公开提交）
+    url: https://github.com/shenyicong/Campus-Vehicle-Statistics-System/security/advisories/new
+    about: 安全问题请通过私人安全通告报告，见 SECURITY.md

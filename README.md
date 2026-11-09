@@ -1,4 +1,11 @@
-# 校园车辆智能统计系统 (Campus Vehicle Statistics System)
+# 校园车辆智能统计系统 · Campus Vehicle Statistics System
+
+[![CI](https://github.com/shenyicong/Campus-Vehicle-Statistics-System/actions/workflows/ci.yml/badge.svg)](https://github.com/shenyicong/Campus-Vehicle-Statistics-System/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+[![Zero frontend dependencies](https://img.shields.io/badge/frontend-zero%20CDN-646CFF)](docs/architecture.md)
+[![Stars](https://img.shields.io/github/stars/shenyicong/Campus-Vehicle-Statistics-System?style=social)](https://github.com/shenyicong/Campus-Vehicle-Statistics-System)
 
 <p align="center">
   <picture>
@@ -7,24 +14,83 @@
   </picture>
 </p>
 
-基于 YOLO 目标检测的车辆智能统计系统（以校园为例）：自动统计校门 / 停车场监控视频中 **轿车 / SUV / 货车 / 客车** 四类车辆的进出数量，按小时、按日生成统计报表与网页实时看板；**场地实有车位由本地人员按现场录入**（如校园 A 区停轿车 / SUV 共 360 位、B 区停客车 / 货车共 180 位），系统再把通行流量推算出的车位需求与实有车位做**供需对比**（余量 / 缺口 / 饱和度 / 状态），为出入口拥堵治理与停车资源规划提供数据依据。
+**从一段监控视频，到可决策的车流数据与停车供需结论。** 基于 YOLO11n ONNX 的四类车型检测（轿车 / SUV / 货车 / 客车）、轻量 IoU 跟踪、虚拟线进出判定，输出小时 / 日粒度报表与纯 SVG 数据驾驶舱；**场地实有车位由本地人员按现场录入**，系统再把流量推算出的泊位需求与实有车位做供需对比（余量 / 缺口 / 饱和度 / 状态）。
 
 > 摄像机装在校门、停车场入口或园区道路都可以，算法与代码不变；换位置后用 `tools/calibrate_line.py` 重新标定虚拟线即可。本仓库以校园为业务示例，不限定具体地点。
+>
+> **English** → [README.en.md](README.en.md)
 
-## 功能特性
+---
 
-- **四类车型检测**：轿车(sedan)、SUV(suv)、货车(truck)、客车(bus)
-- **真实 YOLO 模型**：已接入自训练 YOLO11n ONNX，CPU 即可推理（letterbox 预处理 + 按类别 NMS 后处理）
-- **视频溯源**：支持本地视频文件与 RTSP 实时流（一行配置切换）
-- **轨迹跟踪**：轻量 IoU 跟踪器，跨帧关联同一车辆
-- **进出判定**：基于虚拟检测线 + 穿越方向，判定进入 / 驶出
-- **统计分析**：按小时 / 按日聚合，输出 CSV 与 Excel
-- **场地车位本地设置**：分区名 / 适用车型 / 实有车位数量由本地人员录入，可改 JSON 或直接在看板表单增删分区并保存，系统不写死场地（[`docs/parking_plan.md`](docs/parking_plan.md)）
-- **车位供需对比**：由分车型进出量推算分区峰值在场数 → 需求泊位，与实有车位对比得出余量、缺口、饱和度、状态，并输出大 / 小车位配比与用地参考
-- **数据驾驶舱看板**：深 / 浅双主题、纯 SVG 自绘图表（零外部依赖、离线可用），含 6 张 KPI 卡、分车型进出柱图、车型结构环图、24 小时热力、停车供需环与分区饱和度、逐时段明细；悬浮可看数值，5 秒刷新且不会打断表单编辑
-- **可复现训练**：AMD Radeon Cloud / ROCm 一键脚本（上传 → 切分 → 训练 → 导出 ONNX）
+## 目录
+
+- [亮点](#亮点)
+- [演示](#演示)
+- [系统架构](#系统架构)
+- [60 秒跑通](#60-秒跑通)
+- [安装与真实模型](#安装与真实模型)
+- [项目结构](#项目结构)
+- [配置说明](#配置说明)
+- [模型与训练结果](#模型与训练结果)
+- [真实场景评估](#真实场景评估)
+- [从流量统计到停车规划](#从流量统计到停车规划)
+- [云端训练流程](#云端训练流程)
+- [设计取舍与已知限制](#设计取舍与已知限制)
+- [路线图](#路线图)
+- [贡献 · 文档 · 引用](#贡献--文档--引用)
+- [许可证](#许可证)
+
+---
+
+## 亮点
+
+| 能力 | 实现方式 | 不依赖 |
+| --- | --- | --- |
+| 四类车型检测 | 自训练 YOLO11n → ONNX，letterbox 预处理 + 按类 NMS | GPU / PyTorch 运行时 |
+| 远景小车召回 | 按画面长边自适应分块推理（`auto` / `grid`） | 重新训练模型 |
+| 跨帧关联 | 轻量 IoU 跟踪器，仅返回本帧活跃轨迹 | ByteTrack / DeepSORT |
+| 进出判定 | 虚拟线 + 穿越方向 + 最小净位移抑制抖动 | 车道线标注 |
+| 报表 | 小时 / 日 CSV 与 Excel（`utf-8-sig`，Excel 直接打开） | 数据库 |
+| 数据驾驶舱 | Flask + 内联 SVG 自绘图表，深 / 浅双主题 | Chart.js / CDN / 前端构建 |
+| 车位供需 | 分车型峰值在场数 → 需求泊位，与本地录入的实有车位对比 | 车位级占用传感器 |
+| 可复现训练 | ROCm 云端一键脚本 + 固定回归集 A/B 验收 | 本地 GPU |
+
+设计原则：**一条数据流贯穿到底**（视频 → 检测 → 跟踪 → 计数 → 报表 → 看板），所有环节都可在 `mock` 模式下无模型跑通；**场地与算法解耦**（换机位只改 `LINE_Y`，换场地只改 `data/parking_zones.json`）。
+
+---
+
+## 演示
+
+<p align="center">
+  <img src="docs/real_video_demo.jpg" alt="带检测框与虚拟线的真实视频演示" width="72%">
+</p>
+
+<p align="center"><sub>真实固定机位视频：检测框、虚拟线与进出方向</sub></p>
+
+| 看板 / 训练 | 预览 |
+| --- | --- |
+| 深 / 浅双主题数据驾驶舱 | `python web_dashboard.py` → `http://127.0.0.1:5000`，或 `python tools/make_dashboard_snapshot.py` 生成离线快照 |
+| 训练曲线 | [`docs/training_curves.png`](docs/training_curves.png) |
+| 真实视频评估记录 | [`docs/real_video_eval.md`](docs/real_video_eval.md) |
+
+看板包含 6 张 KPI 卡、分车型进出柱图、车型结构环图、24 小时热力、停车供需环与分区饱和度、逐时段明细；悬浮可看数值，5 秒刷新且不会打断表单编辑。图表全部由 SVG 自绘，**不依赖 Chart.js 或任何 CDN，离线可用**。
+
+---
 
 ## 系统架构
+
+```mermaid
+flowchart LR
+    A["视频源<br/>本地文件 / RTSP"] --> B["检测器<br/>YOLO11n ONNX · 分块推理"]
+    B --> C["IoU 跟踪器<br/>仅输出活跃轨迹"]
+    C --> D["虚拟线判定<br/>方向 + 净位移门限"]
+    D --> E["分车型计数器"]
+    E --> F["小时 / 日报表<br/>CSV · Excel"]
+    F --> G["Flask 数据驾驶舱<br/>SVG 图表"]
+    H["本地场地车位配置<br/>parking_zones.json"] --> I["供需对比<br/>余量 / 缺口 / 饱和度"]
+    F --> I
+    I --> G
+```
 
 ```
 视频源 → 检测器 → 跟踪器(IoU) → 进出判定 → 计数器 → 报表(CSV/Excel) → 网页看板
@@ -32,55 +98,32 @@
 本地人员录入场地车位(data/parking_zones.json) ──────┴→ 供需对比：余量 / 缺口 / 饱和度 / 状态
 ```
 
-## 目录结构
+各模块的契约、坐标约定与关键设计决策见 [`docs/architecture.md`](docs/architecture.md)。
 
-```
-campus_vehicle_system/
-├── config.py                  # 全局配置（路径/类别/虚拟线/视频源/端口）
-├── video_input.py             # 视频输入：本地文件 或 RTSP 实时流
-├── detector.py                # Mock 检测器 + YOLO-ONNX（预处理/解码/NMS 已实现）
-├── tracker.py                 # 轻量 IoU 跟踪器
-├── counter.py                 # 虚拟线进出判定与计数
-├── reporter.py                # 每小时 / 每日 CSV 与 Excel 报表
-├── parking_plan.py            # 场地车位配置读写 + 需求推导 + 供需对比（脚本与看板共用）
-├── main.py                    # 端到端串联入口
-├── make_test_video.py         # 用车型图片合成模拟校门监控测试视频
-├── web_dashboard.py           # Flask 数据驾驶舱：双主题 + 纯 SVG 图表 + 场地车位设置（端口 5000）
-├── cloud/
-│   ├── upload_dataset.sh      # 本机：打包上传数据集与云端脚本
-│   ├── train_car_yolo.sh      # 云端：自检 → 切分 → 训练 → 导出 ONNX
-│   ├── train_car_yolo.py      # 训练入口（NMS 补丁 + 训练 + 导出）
-│   ├── rocm_compat.py         # ROCm 的 torchvision GPU NMS 兼容补丁
-│   └── smoke_test.py          # 1 epoch 冒烟测试
-├── tools/
-│   ├── split_dataset.py       # 8:2 切分 + 生成 data.yaml
-│   ├── validate_yolo_export.py# 导出结果校验（配对/class_id/坐标）
-│   ├── fix_rotation_labels.py # 修复 YOLO HBB 导出跳过旋转框导致空标签
-│   ├── eval_real_video.py     # 真实视频抽样检测评估（检出/置信度/框面积分档）
-│   ├── eval_count_video.py    # 固定机位视频端到端：检测+计数+报表+演示图（一次推理）
-│   ├── calibrate_line.py      # 虚拟线标定 + 车流是否静止判定
-│   ├── plan_parking.py        # 输出供需分析报告（md / csv / xlsx，含 --init-zones）
-│   ├── plot_training_curves.py# 训练曲线四宫格图
-│   └── make_dashboard_snapshot.py # 生成零依赖静态看板预览（数据内联，无需启动服务）
-├── docs/
-│   ├── real_video_eval.md     # 真实视频泛化评估记录
-│   ├── line_calibration.md    # 虚拟线标定与假跨线抑制
-│   ├── parking_plan.md        # 停车资源规划推导方法与边界
-│   ├── real_video_demo.jpg    # 带框带线演示图
-│   └── training_curves.png    # 训练曲线
-├── cloud_setup_yolo26_env.sh  # 兜底：从零重建 ROCm 训练环境
-├── models/.gitkeep            # 放 car_yolo.onnx（模型文件不入库）
-├── data/
-│   ├── .gitkeep
-│   ├── parking_zones.json     # 场地车位配置（本地人员维护，已入库的示例）
-│   ├── test_monitor.mp4       # 测试视频（运行生成，不入库）
-│   └── reports/               # 报表与供需分析输出（运行生成，不入库）
-├── requirements.txt
-├── .gitignore
-└── LICENSE
+---
+
+## 60 秒跑通
+
+不需要 GPU、不需要模型权重、不需要视频文件：
+
+```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate   |   Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+
+# Windows
+set CAMPUS_DETECTOR=mock && python main.py --max_frames 60
+# Linux / macOS
+CAMPUS_DETECTOR=mock python main.py --max_frames 60
+
+python web_dashboard.py     # 打开 http://127.0.0.1:5000
 ```
 
-## 快速开始
+`mock` 模式会生成模拟车流，跑通「检测 → 跟踪 → 计数 → 报表 → 看板」全链路，适合先验证环境再接入真实模型。
+
+---
+
+## 安装与真实模型
 
 ### 1. 准备环境
 
@@ -90,9 +133,11 @@ pip install -r requirements.txt
 # 关键依赖：opencv-python / numpy / onnxruntime / flask / openpyxl
 ```
 
+开发 / 测试额外安装 `pip install -r requirements-dev.txt`，详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
 ### 2. 放入模型
 
-把训练好的 ONNX 放到 `models/car_yolo.onnx`（路径由 `config.YOLO_ONNX` 指定）。
+把训练好的 ONNX 放到 `models/car_yolo.onnx`（路径由 `config.YOLO_ONNX` 指定）。模型权重不入库。
 
 ### 3. 运行统计（默认真实模型）
 
@@ -100,9 +145,7 @@ pip install -r requirements.txt
 python main.py --max_frames 600
 ```
 
-运行后会在 `data/reports/` 生成 `hourly.csv`、`daily.csv` 与 `report.xlsx`。
-
-没有模型或想验证全链路时切回模拟数据：
+运行后会在 `data/reports/` 生成 `hourly.csv`、`daily.csv` 与 `report.xlsx`。没有模型时切回模拟数据：
 
 ```bash
 # Windows
@@ -125,20 +168,12 @@ python tools/make_dashboard_snapshot.py
 # 输出 data/reports/dashboard_preview.html（只读；保存场地配置需启动服务）
 ```
 
-看板为深 / 浅双主题（右上角切换、自动记忆），图表全部由 SVG 自绘，
-**不依赖 Chart.js 或任何 CDN**，离线可用。包含：6 张 KPI 卡、分车型进出分组柱图、
-车型结构环图、24 小时通行热力、停车供需环、分区供需卡、逐时段明细表与规划提示；
-柱图 / 热力格 / 环图均支持悬浮查看数值。
-
 ### 5. 设置本场地的车位（本地人员操作）
 
 两种方式写的是同一个文件 `data/parking_zones.json`：
 
-1. **看板抽屉（推荐）**：打开 `http://127.0.0.1:5000` → 右上角「场地车位设置」→
-   改场地名称、分区名、勾选适用车型、填写实有车位数量 → 点「保存场地配置」。
-   支持「+ 添加分区」「删除」「放弃修改」；5 秒自动刷新不会打断正在编辑的表单。
-2. **文本编辑**：直接改 `data/parking_zones.json`，或先运行
-   `python tools/plan_parking.py --init-zones` 生成一份模板。
+1. **看板抽屉（推荐）**：打开 `http://127.0.0.1:5000` → 右上角「场地车位设置」→ 改场地名称、分区名、勾选适用车型、填写实有车位数量 → 点「保存场地配置」。支持「+ 添加分区」「删除」「放弃修改」；5 秒自动刷新不会打断正在编辑的表单。
+2. **文本编辑**：直接改 `data/parking_zones.json`，或先运行 `python tools/plan_parking.py --init-zones` 生成一份模板。
 
 仓库内的默认示例就是校园场景：
 
@@ -147,13 +182,56 @@ python tools/make_dashboard_snapshot.py
 | A 区 | 轿车 / SUV | 360 |
 | B 区 | 客车 / 货车 | 180 |
 
-分区数量、名称、车型组合、车位数量都不写死；换场地可用
-`set CAMPUS_PARKING_ZONES=D:/path/to/zones.json` 指向另一份配置。
-保存后重新运行规划即可看到供需对比：
+分区数量、名称、车型组合、车位数量都不写死；换场地可用 `set CAMPUS_PARKING_ZONES=D:/path/to/zones.json` 指向另一份配置。保存后重新运行规划即可看到供需对比：
 
 ```bash
 python tools/plan_parking.py        # 输出 parking_plan.md / csv / xlsx
 ```
+
+---
+
+## 项目结构
+
+```
+campus_vehicle_system/
+├── config.py                  # 全局配置（路径 / 类别 / 虚拟线 / 视频源 / 端口）
+├── video_input.py             # 视频输入：本地文件 或 RTSP 实时流
+├── detector.py                # Mock 检测器 + YOLO-ONNX（预处理 / 解码 / NMS / 分块）
+├── tracker.py                 # 轻量 IoU 跟踪器
+├── counter.py                 # 虚拟线进出判定与计数
+├── reporter.py                # 每小时 / 每日 CSV 与 Excel 报表
+├── parking_plan.py            # 场地车位配置读写 + 需求推导 + 供需对比
+├── main.py                    # 端到端串联入口
+├── make_test_video.py         # 用车型图片合成模拟校门监控测试视频
+├── web_dashboard.py           # Flask 数据驾驶舱：双主题 + 纯 SVG 图表 + 场地设置
+├── cloud/                     # ROCm 云端训练：上传 / 训练 / 导出 / 冒烟测试
+├── tools/                     # 数据集切分、增强、回归、评估、标定、规划、上传
+│   ├── augment_dataset_v2.py      # 多车同框 / 小目标 / 硬负样本合成
+│   ├── regression_test.py         # 固定真实场景回归集 A/B
+│   ├── upload_dataset_platform.py # Ultralytics Platform 数据集上传
+│   ├── check_docs_links.py        # 文档本地链接校验（CI 使用）
+│   └── ...                        # calibrate_line / eval_* / plan_parking / split_dataset
+├── tests/                     # 29 项纯逻辑单元测试（tracker / counter / reporter / 配置 / 供需）
+├── docs/                      # 架构、评估记录、标定、停车规划、Hero 与 Social Preview 素材
+├── .github/
+│   ├── workflows/ci.yml       # 3.10 / 3.11 / 3.12 矩阵：lint + 编译 + 测试 + 文档链接
+│   ├── ISSUE_TEMPLATE/        # Bug / Feature 表单
+│   ├── dependabot.yml         # pip 与 Actions 依赖周更
+│   └── PULL_REQUEST_TEMPLATE.md
+├── cloud_setup_yolo26_env.sh  # 兜底：从零重建 ROCm 训练环境
+├── models/.gitkeep            # 放 car_yolo.onnx（模型文件不入库）
+├── data/
+│   ├── parking_zones.json     # 场地车位配置（本地人员维护，已入库的示例）
+│   └── reports/               # 报表与供需分析输出（运行生成，不入库）
+├── pyproject.toml             # ruff / pytest / mypy / coverage 配置
+├── Makefile                   # install / lint / test / check / run / dashboard
+├── requirements.txt · requirements-dev.txt
+├── CONTRIBUTING.md · CODE_OF_CONDUCT.md · SECURITY.md · CHANGELOG.md · CITATION.cff
+├── .editorconfig · .pre-commit-config.yaml · .gitignore · .gitattributes
+└── LICENSE
+```
+
+---
 
 ## 配置说明（config.py 关键字段）
 
@@ -172,7 +250,9 @@ python tools/plan_parking.py        # 输出 parking_plan.md / csv / xlsx
 | `PARKING_ZONES_JSON` | 场地车位配置（默认 `data/parking_zones.json`），由本地人员维护；可用 `CAMPUS_PARKING_ZONES` 切换场地 |
 | `WEB_HOST` / `WEB_PORT` | 看板监听地址 / 端口（默认 127.0.0.1:5000） |
 
-## 本次训练结果
+---
+
+## 模型与训练结果
 
 - **数据**：298 张车图，311 个框（轿车 105 / SUV 52 / 货车 79 / 客车 75），8:2 切分为训练 238 / 验证 60
 - **环境**：AMD Radeon Cloud，ROCm 7.2.1，W7900(gfx1100)，Ultralytics 8.4.203
@@ -180,9 +260,16 @@ python tools/plan_parking.py        # 输出 parking_plan.md / csv / xlsx
 - **指标**：`mAP50 = 0.799`、`mAP50-95 = 0.569`、精确率 `0.725`、召回率 `0.788`
 - **类别顺序**：`0 轿车 / 1 SUV / 2 货车 / 3 客车`，与 `CLASSES = sedan/suv/truck/bus` 一一对齐
 
+> ⚠️ 这些数字对应仓库内的 v1 权重。**验证集指标高不等于真实场景好用**：v1 训练集 96.6% 是「一张图一辆大车」，导致多车同框被合并成巨框、远景小车漏检。改进方向是扩展数据分布（多车同框 / 小目标 / 硬负样本）并用固定回归集验收，而不是单纯加 epoch 或调置信度。相关工具见 `tools/augment_dataset_v2.py` 与 `tools/regression_test.py`。
+
+---
+
 ## 真实场景评估
 
-七段真实素材的评估数据、对比图与结论见 [`docs/real_video_eval.md`](docs/real_video_eval.md)，虚拟线标定见 [`docs/line_calibration.md`](docs/line_calibration.md)，训练曲线见 [`docs/training_curves.png`](docs/training_curves.png)，带框带线演示图见 [`docs/real_video_demo.jpg`](docs/real_video_demo.jpg)。
+七段真实素材的评估数据、对比图与结论见 [`docs/real_video_eval.md`](docs/real_video_eval.md)，虚拟线标定见 [`docs/line_calibration.md`](docs/line_calibration.md)，训练曲线见 [`docs/training_curves.png`](docs/training_curves.png)。
+
+<details>
+<summary><b>展开完整实验记录（要点与数字）</b></summary>
 
 - 夜间行车记录仪视频：框住的都是真车但漏检明显，平均置信度由同域 0.848 降到 0.535。
 - 白天固定机位俯拍竖屏视频：**首因是尺度压缩**——1080×1920 整图 letterbox 到 640×640 后有效宽度只剩约 360px，远景小车缩没；分块后检出框 **125 → 623**、零检出帧 **39.3% → 0%**，无需重训。
@@ -195,6 +282,8 @@ python tools/plan_parking.py        # 输出 parking_plan.md / csv / xlsx
 - **限制**：远景小车仍漏检约一半；单横线用于高速双向车流只是链路演示，不是真实校门通行量真值；12 秒片段只有 1 个小时桶；计数未经人工逐帧核验。补 50–100 张俯拍远景样本微调、换 ByteTrack 与分车道双向虚拟线是后续重点。
 - 工具：`eval_real_video.py`（抽样检测评估 + 框面积分档）、`calibrate_line.py`（虚拟线标定 + 静止判定）、`eval_count_video.py`（固定机位视频一次推理产出检测统计 + 计数 + 报表 + 演示图）。
 
+</details>
+
 一键复现（换成自己的固定机位视频，先标定再端到端）：
 
 ```bash
@@ -202,16 +291,14 @@ python tools/calibrate_line.py --video "D:/path/to.mp4" --frames 240
 python tools/eval_count_video.py --video "D:/path/to.mp4" --tile grid --line-y 0.65 --out data/real_eval_demo
 ```
 
-## 应用定位：从流量统计到停车规划
+---
 
-系统统计的是**通过虚拟线的分车型通行流量**，不是车位级占用检测。
-「有多少车位」由**本地人员按现场录入**（供给侧），「需要多少车位」由流量**推算**（需求侧），
-两者口径不同，系统做的是**供需对比**。算法层与业务位置解耦：
-校门 / 停车场入口 / 园区道路共用同一套代码，换机位只需重标定 `LINE_Y`；
-换场地只需改 `data/parking_zones.json`。
+## 从流量统计到停车规划
+
+系统统计的是**通过虚拟线的分车型通行流量**，不是车位级占用检测。「有多少车位」由**本地人员按现场录入**（供给侧），「需要多少车位」由流量**推算**（需求侧），两者口径不同，系统做的是**供需对比**。算法层与业务位置解耦：校门 / 停车场入口 / 园区道路共用同一套代码，换机位只需重标定 `LINE_Y`；换场地只需改 `data/parking_zones.json`。
 
 | 决策 | 用到的数据 | 输出 |
-|---|---|---|
+| --- | --- | --- |
 | 拥堵治理 | 每小时进出合计、高峰小时 | 疏导时段、出入口通行能力评估 |
 | 车位够不够 | 场地实有车位 + 分车型峰值在场数 | 每区余量 / 缺口、峰值饱和度、状态（供给充足 / 接近饱和 / 超负荷） |
 | 分区与配比规划 | 分区适用车型、需求泊位 | 小车位（轿车 / SUV）与大车位（货车 / 客车）配比、用地面积参考 |
@@ -224,21 +311,22 @@ python web_dashboard.py                           # 数据驾驶舱：统计图�
 python tools/make_dashboard_snapshot.py           # 无需启动服务的静态预览快照
 ```
 
-以重庆内环高速俯拍真实视频的报表 + 校园默认场地配置为例
-（12.1 秒 → 1 个小时桶，仅演示链路）：
+以重庆内环高速俯拍真实视频的报表 + 校园默认场地配置为例（12.1 秒 → 1 个小时桶，仅演示链路）：
 
 | 分区 | 适用车型 | 实有车位 | 峰值在场 | 需求泊位 | 余量 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | A 区 | 轿车 / SUV | 360 | 32 | 39 | +321 | 供给充足 |
 | B 区 | 客车 / 货车 | 180 | 4 | 5 | +175 | 供给充足 |
 
-实有合计 540 / 需求合计 44，峰值饱和度 6.7%；需求侧参考配比仍为
-小车位 39 / 大车位 5（88.6% / 11.4%），用地约 941.6 ㎡，高峰小时通行 72 辆次。
-⚠️ 因为样本只有 12 秒，这里会提示「车位明显富余」，**不能**据此判定车位真的多了，
-需连续多天、覆盖全部出入口的报表。公式、默认参数、前提与局限见
-[`docs/parking_plan.md`](docs/parking_plan.md)。
+实有合计 540 / 需求合计 44，峰值饱和度 6.7%；需求侧参考配比仍为小车位 39 / 大车位 5（88.6% / 11.4%），用地约 941.6 ㎡，高峰小时通行 72 辆次。
+⚠️ 因为样本只有 12 秒，这里会提示「车位明显富余」，**不能**据此判定车位真的多了，需连续多天、覆盖全部出入口的报表。公式、默认参数、前提与局限见 [`docs/parking_plan.md`](docs/parking_plan.md)。
+
+---
 
 ## 云端训练流程
+
+<details>
+<summary><b>展开 ROCm 云端训练步骤与踩坑记录</b></summary>
 
 1. **标注**：X-AnyLabeling 标注四类 → 导出 `YOLO HBB`（水平矩形框）。
    > 坑：旋转框会被 YOLO HBB 导出器静默跳过，生成空 txt（错误负样本），用 `tools/fix_rotation_labels.py` 修复。
@@ -253,7 +341,63 @@ python tools/make_dashboard_snapshot.py           # 无需启动服务的静态�
 - 复用镜像自带 `/opt/venv` 的 torch 2.9.1+hip（GPU 可用），**不下载 5.8 GiB 的 torch ROCm wheel**；`cloud_setup_yolo26_env.sh` 仅作兜底。
 - 镜像的 torchvision 只有 CPU 版 NMS kernel，Ultralytics 验证阶段会在 CUDA 张量上调用 `torchvision.ops.nms` 并报错。`cloud/rocm_compat.py` 把 NMS 输入临时搬到 CPU、算完搬回原设备，行为与原生一致。
 - 云端 `pypi.org` 很慢，安装统一走阿里云镜像。
+- 导出 ONNX 时须显式指定 `format=onnx`、`opset=12`、`imgsz=640`、`simplify=false`，输出布局为 `[1, 8, 8400]`；平台默认命令尾部常带 `torchscript` / `simplify=true`，需要手动改。
+
+</details>
+
+---
+
+## 设计取舍与已知限制
+
+| 取舍 | 原因 | 代价 / 边界 |
+| --- | --- | --- |
+| IoU 跟踪而非 ByteTrack | 零额外依赖、CPU 可跑、逻辑可审计 | 遮挡与长时间丢失后 ID 会切换 |
+| 按类 NMS | 四类车型互不抑制，保留全部类别候选 | 同一辆车可能同时保留两个类别框 → 计数重复（见路线图） |
+| 单条虚拟线 | 标定简单、适配固定机位单向车流 | 双向 / 多车道需分车道线（见路线图） |
+| 流量推算泊位需求 | 无需车位传感器即可给出规划依据 | 是**需求下限**，依赖「所有出入口都被统计」的前提 |
+| 场地车位本地录入 | 系统不写死任何场地信息 | 配置准确性由现场人员负责 |
+
+更完整的契约说明见 [`docs/architecture.md`](docs/architecture.md)，常见问题见 [`docs/FAQ.md`](docs/FAQ.md)。
+
+---
+
+## 路线图
+
+- [x] YOLO11n ONNX CPU 推理、按类 NMS 与自适应分块
+- [x] IoU 跟踪、虚拟线进出判定、小时 / 日报表
+- [x] 双主题零依赖 SVG 数据驾驶舱与静态快照
+- [x] 场地车位配置与供需对比
+- [x] CI、单元测试、贡献规范与文档体系
+- [ ] 轨迹级类别众数投票，降低单帧错分对分车型计数的影响
+- [ ] 跨类 NMS，消除同一辆车被保留为两个类别的重复框
+- [ ] 分车道双向虚拟线，适配双向车流
+- [ ] v2 数据集（多车同框 / 小目标 / 硬负样本）重训 + 固定回归集验收
+
+有想法？欢迎通过 [Issue 模板](https://github.com/shenyicong/Campus-Vehicle-Statistics-System/issues/new/choose) 提建议。
+
+---
+
+## 贡献 · 文档 · 引用
+
+| | 链接 |
+| --- | --- |
+| 开发规范与 PR 流程 | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| 行为准则 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
+| 安全策略 | [SECURITY.md](SECURITY.md) |
+| 更新日志 | [CHANGELOG.md](CHANGELOG.md) |
+| 架构与模块契约 | [docs/architecture.md](docs/architecture.md) |
+| 常见问题 | [docs/FAQ.md](docs/FAQ.md) |
+| 真实视频评估 | [docs/real_video_eval.md](docs/real_video_eval.md) |
+| 虚拟线标定 | [docs/line_calibration.md](docs/line_calibration.md) |
+| 停车规划方法与边界 | [docs/parking_plan.md](docs/parking_plan.md) |
+| 英文说明 | [README.en.md](README.en.md) |
+
+如果本项目对你有帮助，欢迎 Star ⭐；引用请使用仓库根目录的 [`CITATION.cff`](CITATION.cff)（GitHub 右上角 **Cite this repository** 可直接生成 BibTeX）。
+
+**致谢**：[Ultralytics YOLO](https://github.com/ultralytics/ultralytics)、[OpenCV](https://opencv.org/)、[ONNX Runtime](https://onnxruntime.ai/)、[Flask](https://flask.palletsprojects.com/)、[openpyxl](https://openpyxl.readthedocs.io/)、[X-AnyLabeling](https://github.com/CVHub520/X-AnyLabeling) 与 AMD Radeon Cloud 提供的训练算力。
+
+---
 
 ## 许可证
 
-[MIT](LICENSE)
+[MIT](LICENSE) © 2026 shenyicong

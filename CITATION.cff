@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Campus Vehicle Statistics System"
+abstract: "YOLO11n ONNX based vehicle detection, IoU tracking, virtual-line counting and a zero-dependency dashboard for campus traffic statistics and parking supply-demand analysis."
+type: software
+authors:
+  - name: "shenyicong"
+repository-code: "https://github.com/shenyicong/Campus-Vehicle-Statistics-System"
+url: "https://github.com/shenyicong/Campus-Vehicle-Statistics-System"
+license: MIT
+version: 0.2.0
+date-released: 2026-11-09
+keywords:
+  - object-detection
+  - yolo
+  - onnx
+  - vehicle-counting
+  - traffic-analysis
+  - flask

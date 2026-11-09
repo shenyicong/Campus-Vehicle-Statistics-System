@@ -26,6 +26,22 @@ Thumbs.db
 .vscode/
 *.log
 
+# 测试 / 工具缓存
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.egg-info/
+build/
+dist/
+
+# 本地凭据（绝不入库）
+.env
+*.key
+*_api_key.txt
+
 # 论文 / 课程设计材料 —— 用户明确要求「涉及论文的不上传」
 # 覆盖 GitHub 提交与任何 `git add .`；确需入库时手动 git add -f
 docs/thesis_*

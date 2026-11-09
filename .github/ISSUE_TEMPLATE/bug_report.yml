@@ -1,0 +1,89 @@
+name: Bug 报告
+description: 报告可复现的功能缺陷或运行时错误
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提交前请先搜索已有 Issue。请勿在公开 Issue 中粘贴密钥、内网地址或个人信息。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 现象描述
+      description: 期望发生什么？实际发生了什么？
+      placeholder: 启动看板后 /api/stats 返回 500，期望返回统计 JSON……
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 请给出最小可复现命令或操作序列
+      placeholder: |
+        1. python -m venv .venv && pip install -r requirements.txt
+        2. 设置 CAMPUS_DETECTOR=mock
+        3. python main.py --max_frames 60
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 报错堆栈
+      render: shell
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / 提交
+      placeholder: "例如 v0.2.0 或 commit b6962a3"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - Windows
+        - Linux
+        - macOS
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python 版本
+      placeholder: "例如 3.12.4"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: 运行时模式
+      options:
+        - mock（模拟检测）
+        - yolo_onnx（真实模型）
+        - 网页看板
+        - 云端训练脚本
+        - 其他工具脚本
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 确认
+      options:
+        - label: 我已搜索过已有 Issue 与 Discussions
+          required: true
+        - label: 我已确认日志中不含密钥、令牌或隐私数据
+          required: true

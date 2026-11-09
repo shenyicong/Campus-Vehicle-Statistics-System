@@ -1,0 +1,43 @@
+# 本项目是「可直接运行的脚本集合」，暂不发布到 PyPI；
+# 此文件仅集中管理开发工具配置（ruff / pytest / mypy / coverage）。
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = [
+  "data",
+  "models",
+  "docs",
+  "__pycache__",
+  ".venv",
+  "build",
+  "dist",
+]
+
+[tool.ruff.lint]
+# 阶段性只启用致命规则（语法错误、未定义名、重复定义等）。
+# 历史代码尚未统一格式化，待逐步重构后再收紧到完整规则集。
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+filterwarnings = [
+  "ignore::DeprecationWarning",
+]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+check_untyped_defs = false
+exclude = ["data/|docs/|models/|build/"]
+
+[tool.coverage.run]
+omit = [
+  "tests/*",
+  "tools/*",
+  "cloud/*",
+  "web_dashboard.py",
+  "*/__pycache__/*",
+]
