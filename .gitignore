@@ -25,3 +25,12 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# 论文 / 课程设计材料 —— 用户明确要求「涉及论文的不上传」
+# 覆盖 GitHub 提交与任何 `git add .`；确需入库时手动 git add -f
+docs/thesis_*
+docs/wechat_article*
+docs/*论文*
+docs/*任务书*
+docs/*开题*
+docs/*.docx

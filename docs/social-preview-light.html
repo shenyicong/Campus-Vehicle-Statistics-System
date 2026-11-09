@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Social Preview (Light) - 校园车辆智能统计系统</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    font-family: "Microsoft YaHei", "Microsoft JhengHei", "Segoe UI", sans-serif;
+    color: var(--ink); background: #08111F; -webkit-font-smoothing: antialiased;
+  }
+
+  /* ===== 主题变量：深色为默认，body.light 覆盖即得到浅色版 ===== */
+  :root {
+    --bg-a:#0A1526; --bg-b:#0C1C31; --bg-c:#0A1A2E;
+    --ink:#EAF3FF; --ink2:#F2F8FF; --sub:#B9CFE6; --muted:#8EAECB; --dim:#7FA5C6;
+    --panel-a:rgba(24,45,72,.92); --panel-b:rgba(13,28,48,.92);
+    --border:rgba(130,175,220,.20); --grid:rgba(120,170,220,.055);
+    --soft:rgba(255,255,255,.045); --stat-line:rgba(130,175,220,.16);
+    --cyan:#4CC9F0; --green:#34D399; --amber:#FBBF24; --violet:#A78BFA; --pink:#F472B6;
+    --title-g:linear-gradient(92deg,#FFFFFF 0%,#DCEEFF 55%,#9BD4F5 100%);
+    --pill-bg:rgba(76,201,240,.10); --pill-ink:#9FD8F2;
+    --chip-ink:#B7D2E8;
+  }
+  body.light {
+    --bg-a:#F9FCFF; --bg-b:#EDF6FF; --bg-c:#F5FAFF;
+    --ink:#123A5C; --ink2:#0D2C4B; --sub:#4A6B8A; --muted:#5C7C99; --dim:#5A7A99;
+    --panel-a:rgba(255,255,255,.97); --panel-b:rgba(236,246,255,.97);
+    --border:rgba(70,120,170,.26); --grid:rgba(60,110,160,.085);
+    --soft:rgba(255,255,255,.82); --stat-line:rgba(70,120,170,.22);
+    --cyan:#0E7C9B; --green:#12855C; --amber:#9A6A00; --violet:#6D4BC3; --pink:#B8407F;
+    --title-g:linear-gradient(92deg,#0B2B4A 0%,#14507A 55%,#0E7C9B 100%);
+    --pill-bg:rgba(14,124,155,.09); --pill-ink:#0E7C9B;
+    --chip-ink:#33577A;
+  }
+
+  .bg { position:absolute; inset:0;
+    background:
+      radial-gradient(680px 400px at 6% 2%, rgba(76,201,240,.20), transparent 70%),
+      radial-gradient(640px 380px at 96% 98%, rgba(52,211,153,.14), transparent 72%),
+      radial-gradient(520px 320px at 72% 4%, rgba(167,139,250,.12), transparent 72%),
+      linear-gradient(118deg, var(--bg-a) 0%, var(--bg-b) 48%, var(--bg-c) 100%); }
+  .grid { position:absolute; inset:0; opacity:.55;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    -webkit-mask-image: linear-gradient(90deg,#000 0%,#000 62%,transparent 100%); }
+  .topline { position:absolute; top:0; left:0; right:0; height:6px;
+    background:linear-gradient(90deg,#4CC9F0 0%,#34D399 34%,#FBBF24 66%,#A78BFA 100%); }
+
+  .wrap { position:relative; width:100%; height:100%; padding:46px 64px 44px;
+    display:flex; gap:38px; align-items:center; }
+  .left { flex:0 0 686px; display:flex; flex-direction:column; }
+  .right { flex:1; display:flex; flex-direction:column; gap:16px; }
+
+  /* ---------- 左栏 ---------- */
+  .eyebrow { display:flex; align-items:center; gap:12px; margin-bottom:22px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#34D399; box-shadow:0 0 14px #34D399; }
+  .pill { font:600 15px/1 "Segoe UI",sans-serif; letter-spacing:2px; color:var(--pill-ink);
+    background:var(--pill-bg); border:1px solid color-mix(in srgb, var(--cyan) 34%, transparent);
+    padding:9px 15px; border-radius:999px; }
+  .oss { font:600 13px/1 "Consolas",monospace; letter-spacing:1.6px; color:var(--dim); }
+
+  h1 { font-size:60px; line-height:1.12; font-weight:800; letter-spacing:1px;
+    background:var(--title-g); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .en { font:500 20px/1.3 "Segoe UI",sans-serif; color:var(--dim); letter-spacing:2px; margin-top:10px; }
+  .rule { width:100%; height:1px; margin:26px 0 22px;
+    background:linear-gradient(90deg,var(--cyan),rgba(120,170,220,.18) 42%,transparent); }
+  .tagline { font-size:21px; line-height:1.85; color:var(--sub); }
+  .tagline b { color:var(--cyan); font-weight:700; }
+  .tagline em { font-style:normal; color:var(--green); font-weight:700; }
+
+  .stats { display:flex; margin-top:32px; }
+  .stat { flex:1; padding-left:20px; border-left:2px solid var(--stat-line); }
+  .stat:first-child { padding-left:0; border-left:0; }
+  .stat .v { font:700 34px/1.05 "Consolas","Segoe UI",monospace; color:var(--ink2); }
+  .stat .v.cy { color:var(--cyan); } .stat .v.gr { color:var(--green); }
+  .stat .v.am { color:var(--amber); } .stat .v.vi { color:var(--violet); }
+  .stat .k { font-size:14px; color:var(--muted); margin-top:9px; letter-spacing:.6px; }
+
+  .tech { display:flex; align-items:center; gap:8px; margin-top:34px; }
+  .tech .lbl { font:600 13px/1 "Consolas",monospace; letter-spacing:1.6px; color:var(--dim); margin-right:4px; }
+  .tech span { font:600 14px/1 "Consolas","Microsoft YaHei",monospace; color:var(--chip-ink);
+    background:var(--soft); border:1px solid var(--border); padding:8px 11px; border-radius:7px; }
+  .tech span.lbl { background:transparent; border:0; padding:0; }
+
+  /* ---------- 右栏：监控画面 ---------- */
+  .cam { border-radius:16px; padding:14px 14px 12px;
+    background:linear-gradient(160deg,var(--panel-a),var(--panel-b));
+    border:1px solid var(--border); }
+  .cam-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:11px;
+    font:600 12px/1 "Consolas",monospace; letter-spacing:1.1px; color:var(--muted); }
+  .cam-head .live { color:var(--green); display:flex; align-items:center; gap:6px; }
+  .cam-head .live i { width:7px; height:7px; border-radius:50%; background:var(--green); display:block; }
+  .cam svg { display:block; width:100%; height:auto; border-radius:9px; }
+  .hud { display:flex; align-items:center; gap:7px; margin-top:11px; }
+  .hud span { font:700 12px/1 "Consolas","Microsoft YaHei",monospace; letter-spacing:.6px;
+    padding:7px 10px; border-radius:6px; white-space:nowrap; }
+  .hud .in { color:var(--green); background:color-mix(in srgb, var(--green) 12%, transparent); }
+  .hud .out { color:var(--amber); background:color-mix(in srgb, var(--amber) 12%, transparent); }
+  .hud .line { color:var(--cyan); background:color-mix(in srgb, var(--cyan) 10%, transparent);
+    margin-left:auto; font-weight:600; }
+
+  .flow { display:flex; align-items:center; justify-content:space-between;
+    font:600 13px/1 "Microsoft YaHei",sans-serif; color:var(--muted); padding:0 2px; }
+  .flow b { color:var(--ink2); font-weight:700; }
+  .flow .a { color:var(--cyan); }
+  .outputs { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; }
+  .outputs .lbl { font:600 11px/1 "Consolas",monospace; letter-spacing:1.2px; color:var(--dim); margin-right:2px; }
+  .outputs span { font:600 11.5px/1 "Consolas","Microsoft YaHei",monospace; color:var(--chip-ink);
+    background:var(--soft); border:1px solid var(--border); padding:6px 7px; border-radius:6px;
+    white-space:nowrap; }
+  .outputs span.lbl { background:transparent; border:0; padding:0; }
+
+  /* ---------- 底部输入输出 ---------- */
+  .foot { position:absolute; left:64px; right:64px; bottom:20px;
+    display:flex; align-items:center; justify-content:space-between;
+    font:600 13px/1 "Microsoft YaHei",sans-serif; letter-spacing:.6px; color:var(--dim); }
+  .foot .i { color:var(--cyan); } .foot .o { color:var(--green); }
+  .foot .sep { color:var(--muted); margin:0 12px; }
+  .foot .lic { font:600 12px/1 "Consolas",monospace; letter-spacing:1.4px; color:var(--muted); }
+</style>
+</head>
+<body class="light">
+<div class="bg"></div><div class="grid"></div><div class="topline"></div>
+<div class="wrap">
+
+  <div class="left">
+    <div class="eyebrow">
+      <span class="dot"></span>
+      <span class="pill">PYTHON &nbsp;·&nbsp; YOLO11n ONNX &nbsp;·&nbsp; CPU-ONLY</span>
+      <span class="oss">OPEN SOURCE / MIT</span>
+    </div>
+    <h1>校园车辆智能统计系统</h1>
+    <div class="en">CAMPUS VEHICLE STATISTICS SYSTEM</div>
+    <div class="rule"></div>
+    <div class="tagline">监控视频 → <b>四类车检测</b> → <b>虚拟线进出计数</b><br>
+      → 小时报表 · 实时看板 · <em>车位供需分析</em></div>
+
+    <div class="stats">
+      <div class="stat"><div class="v cy">4 类</div><div class="k">车型识别</div></div>
+      <div class="stat"><div class="v gr">0.799</div><div class="k">mAP50</div></div>
+      <div class="stat"><div class="v">0 GPU</div><div class="k">CPU 离线推理</div></div>
+      <div class="stat"><div class="v am">6 KPI</div><div class="k">实时看板</div></div>
+    </div>
+
+    <div class="tech">
+      <span class="lbl">TECH STACK</span>
+      <span>Python</span><span>OpenCV</span><span>ONNX Runtime</span><span>Flask</span><span>openpyxl</span>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="cam">
+      <div class="cam-head">
+        <span class="live"><i></i>CAM 01 · SCHOOL GATE · LIVE</span>
+        <span>YOLO11n / 640</span>
+      </div>
+      <svg viewBox="0 0 440 232" xmlns="http://www.w3.org/2000/svg">
+        <rect width="440" height="232" fill="#0B1B2C"/>
+        <!-- 路面与车道 -->
+        <path d="M0 18 H440 M0 214 H440" stroke="#1C3A54" stroke-width="1.4"/>
+        <path d="M0 116 H440" stroke="#254A69" stroke-width="1" stroke-dasharray="16 12"/>
+        <path d="M74 18 V214 M366 18 V214" stroke="#16304A" stroke-width="1"/>
+        <path d="M0 62 H440 M0 170 H440" stroke="#16304A" stroke-width="1" opacity=".7"/>
+        <!-- 虚拟检测线 -->
+        <path d="M0 132 H440" stroke="#4CC9F0" stroke-width="2" stroke-dasharray="10 7" opacity=".95"/>
+        <rect x="6" y="116" width="98" height="14" rx="3" fill="rgba(6,16,30,.82)"/>
+        <text x="11" y="126" fill="#7FD4F5" font-size="9" font-family="Consolas">VIRTUAL LINE</text>
+        <!-- 检测框 -->
+        <rect x="34" y="36" width="76" height="40" rx="3" fill="rgba(76,201,240,.11)" stroke="#4CC9F0" stroke-width="1.8"/>
+        <text x="34" y="30" fill="#4CC9F0" font-size="11" font-family="Microsoft YaHei">轿车 0.91</text>
+        <rect x="150" y="74" width="82" height="44" rx="3" fill="rgba(52,211,153,.11)" stroke="#34D399" stroke-width="1.8"/>
+        <text x="150" y="68" fill="#34D399" font-size="11" font-family="Microsoft YaHei">SUV 0.88</text>
+        <rect x="268" y="30" width="96" height="50" rx="3" fill="rgba(251,191,36,.11)" stroke="#FBBF24" stroke-width="1.8"/>
+        <text x="268" y="24" fill="#FBBF24" font-size="11" font-family="Microsoft YaHei">货车 0.86</text>
+        <rect x="104" y="158" width="104" height="48" rx="3" fill="rgba(167,139,250,.11)" stroke="#A78BFA" stroke-width="1.8"/>
+        <text x="110" y="176" fill="#A78BFA" font-size="11" font-family="Microsoft YaHei">客车 0.83</text>
+        <!-- 方向箭头 -->
+        <path d="M408 36 V96" stroke="#34D399" stroke-width="2.4"/>
+        <path d="M402 90l6 7 6-7" fill="none" stroke="#34D399" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="394" y="28" fill="#34D399" font-size="10" font-family="Consolas">IN</text>
+        <path d="M424 198 V138" stroke="#FBBF24" stroke-width="2.4"/>
+        <path d="M418 144l6-7 6 7" fill="none" stroke="#FBBF24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="408" y="216" fill="#FBBF24" font-size="10" font-family="Consolas">OUT</text>
+        <!-- 角标 -->
+        <path d="M14 14 h18 M14 14 v18 M426 14 h-18 M426 14 v18 M14 218 h18 M14 218 v-18 M426 218 h-18 M426 218 v-18"
+              stroke="#3E6C92" stroke-width="1.6" fill="none"/>
+      </svg>
+      <div class="hud">
+        <span class="in">IN ▲ 进</span><span class="out">OUT ▼ 出</span>
+        <span class="line">IoU + LINE</span>
+      </div>
+    </div>
+
+    <div class="flow">
+      <span><b>01</b> 视频</span><span class="a">▶</span>
+      <span><b>02</b> 检测</span><span class="a">▶</span>
+      <span><b>03</b> 跟踪计数</span><span class="a">▶</span>
+      <span><b>04</b> 报表</span><span class="a">▶</span>
+      <span><b>05</b> 看板</span>
+    </div>
+
+    <div class="outputs">
+      <span class="lbl">OUTPUT</span>
+      <span>hourly.csv</span><span>report.xlsx</span><span>Flask 看板</span><span>供需报告</span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div><span class="i">INPUT &nbsp;监控视频 / RTSP</span><span class="sep">──────▶</span><span class="o">OUTPUT &nbsp;报表 · 看板 · 停车供需</span></div>
+    <div class="lic">DETECTION · TRACKING · COUNTING · ANALYTICS</div>
+  </div>
+</div>
+</body>
+</html>

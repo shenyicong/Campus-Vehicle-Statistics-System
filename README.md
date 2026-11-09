@@ -1,5 +1,12 @@
 # 校园车辆智能统计系统 (Campus Vehicle Statistics System)
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/hero.png">
+    <img src="docs/hero-light.png" alt="校园车辆智能统计系统：视频接入 → YOLO11n 检测 → 跟踪计数 → 报表 → 看板与车位供需" width="100%">
+  </picture>
+</p>
+
 基于 YOLO 目标检测的车辆智能统计系统（以校园为例）：自动统计校门 / 停车场监控视频中 **轿车 / SUV / 货车 / 客车** 四类车辆的进出数量，按小时、按日生成统计报表与网页实时看板；**场地实有车位由本地人员按现场录入**（如校园 A 区停轿车 / SUV 共 360 位、B 区停客车 / 货车共 180 位），系统再把通行流量推算出的车位需求与实有车位做**供需对比**（余量 / 缺口 / 饱和度 / 状态），为出入口拥堵治理与停车资源规划提供数据依据。
 
 > 摄像机装在校门、停车场入口或园区道路都可以，算法与代码不变；换位置后用 `tools/calibrate_line.py` 重新标定虚拟线即可。本仓库以校园为业务示例，不限定具体地点。
