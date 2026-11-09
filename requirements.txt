@@ -3,7 +3,7 @@ opencv-python>=4.8.0
 numpy>=1.24.0
 flask>=3.0.0
 onnxruntime>=1.16.0      # 真实 YOLO-ONNX 检测(CPU 推理)
-openpyxl>=3.1.0          # Excel 报表导出(可选)
+openpyxl>=3.1.5          # Excel 报表导出(可选)
 
 # 训练依赖（在 AMD 云端 ROCm 环境安装，见 cloud_setup_yolo26_env.sh）
 # ultralytics>=8.0
