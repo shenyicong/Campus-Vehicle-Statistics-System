@@ -43,6 +43,12 @@ ENTER_WHEN = "down"
 # 静止车流/延时视频建议保持默认；可 set CAMPUS_MIN_MOVE=0.02 调整
 MIN_TRACK_MOVE = float(os.environ.get("CAMPUS_MIN_MOVE", "0.03"))
 
+# 创新点 3 A/B：轨迹级车型众数投票
+# 0 = A组(默认)：车型取当前帧检测结果，保持 125→623 / 进54出18 等既有实验数字不变
+# 1 = B组：车型取整条轨迹生命周期的众数，单帧误判被多数帧纠正
+# 单变量实验时只切这一项: set CAMPUS_CLS_VOTE=1
+CLS_VOTE = os.environ.get("CAMPUS_CLS_VOTE", "0") == "1"
+
 # 报表
 HOURLY_CSV = os.path.join(REPORT_DIR, "hourly.csv")
 DAILY_CSV  = os.path.join(REPORT_DIR, "daily.csv")

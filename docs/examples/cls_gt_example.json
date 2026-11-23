@@ -1,0 +1,16 @@
+{
+  "_note": "示例真值文件，请按人工复核结果修改。类别索引: 0=sedan(轿车) 1=suv 2=truck(货车) 3=bus(客车)。小孩玩具车不属于车辆，不要标注。图片路径来自 tools/regression_test.py 的 DEFAULT_IMAGES。第二张图的车辆数量是占位示例，务必按实际画面核对后再作为正式真值使用。",
+  "classes": ["sedan", "suv", "truck", "bus"],
+  "samples": [
+    {
+      "image": "C:\\Users\\Q2730\\.workbuddy\\clipboard-images\\clipboard-2026-11-09T08-39-13-462Z-9a4d915d.jpg",
+      "labels": [1, 0, 0],
+      "_desc": "三车拼图：最左 SUV，中间小孩玩具车（不标），右侧两辆轿车"
+    },
+    {
+      "image": "C:\\Users\\Q2730\\.workbuddy\\clipboard-images\\clipboard-2026-11-09T08-39-13-464Z-0c1cc990.jpg",
+      "labels": [2, 2, 2, 2, 2, 2],
+      "_desc": "成排微卡：至少 6 辆且多为货车，数量请人工复核"
+    }
+  ]
+}

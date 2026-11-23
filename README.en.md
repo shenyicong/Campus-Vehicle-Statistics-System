@@ -17,6 +17,8 @@
 
 An end-to-end, CPU-friendly vehicle statistics pipeline: YOLO11n exported to ONNX detects four classes (sedan / SUV / truck / bus), a lightweight IoU tracker associates detections across frames, and a virtual line determines entry / exit direction. Hourly and daily reports feed a Flask dashboard drawn entirely with inline SVG — no CDN, no frontend build, no GPU required at inference time. On-site parking capacity is entered locally by the operator and compared against demand derived from traffic flow.
 
+> 🚀 **Live demo (no install required)**: [Campus Vehicle Dashboard](https://campus-vehicle-dashboard.app.workbuddy.host/?sharecode=XX4GO6JVCQ)
+
 ## Why this project
 
 | Feature | Implementation | Without |

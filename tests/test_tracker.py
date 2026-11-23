@@ -57,3 +57,51 @@ def test_track_pruned_after_max_miss():
     t.update([])  # miss = 1
     t.update([])  # miss = 2 > max_miss
     assert t.tracks == []
+
+
+# ---- 创新点 3 A/B：轨迹级车型众数投票 ----
+
+def test_A_cls_vote_off_uses_latest_frame():
+    """A 组（默认）保持原行为：车型取当前帧检测类别。"""
+    t = IoUTracker(cls_vote=False)
+    t.update([_det(0, 0, 10, 10, cls=0)])
+    out = t.update([_det(1, 1, 11, 11, cls=1)])
+    assert out[0]["cls"] == 1
+
+
+def test_B_majority_vote_corrects_single_frame_error():
+    """B 组：3 帧中 2 帧为货车、1 帧误判为轿车，整条轨迹应判为货车。"""
+    t = IoUTracker(cls_vote=True)
+    t.update([_det(0, 0, 10, 10, cls=2)])
+    t.update([_det(1, 1, 11, 11, cls=2)])
+    out = t.update([_det(2, 2, 12, 12, cls=0)])
+    assert out[0]["cls"] == 2           # 众数纠正单帧错检
+    assert out[0]["last_cls"] == 0      # 同时保留本帧原始检测，供平票回退
+    assert out[0]["cls_votes"] == {2: 2, 0: 1}
+
+
+def test_B_tie_falls_back_to_latest_detection():
+    """平票时退化为最近一帧检测类别，与 A 组语义一致。"""
+    t = IoUTracker(cls_vote=True)
+    t.update([_det(0, 0, 10, 10, cls=1)])
+    out = t.update([_det(1, 1, 11, 11, cls=2)])
+    assert out[0]["cls"] == 2
+
+
+def test_missed_frame_does_not_cast_vote():
+    """未匹配的帧不应投票，否则轨迹停滞时会把静止类别越投越多。"""
+    t = IoUTracker(cls_vote=True, max_miss=5)
+    t.update([_det(0, 0, 10, 10, cls=0)])
+    t.update([])
+    t.update([_det(1, 1, 11, 11, cls=0)])
+    assert t.tracks[0]["cls_votes"] == {0: 2}
+
+
+def test_votes_are_isolated_per_track():
+    """多条轨迹各自投票，不能相互串票。"""
+    t = IoUTracker(cls_vote=True)
+    t.update([_det(0, 0, 10, 10, cls=0), _det(50, 50, 60, 60, cls=1)])
+    t.update([_det(1, 1, 11, 11, cls=0), _det(51, 51, 61, 61, cls=0)])
+    out = t.update([_det(2, 2, 12, 12, cls=0), _det(52, 52, 62, 62, cls=1)])
+    assert sorted(o["cls"] for o in out) == [0, 1]
+    assert out[1]["cls_votes"] == {1: 2, 0: 1}

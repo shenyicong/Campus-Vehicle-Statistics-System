@@ -12,19 +12,51 @@ def iou(a, b):
 
 
 class IoUTracker:
-    def __init__(self, iou_thresh=0.3, max_miss=30):
-        self.tracks = []      # {id, bbox, cls, conf, miss}
+    """IoU 跟踪器，内置创新点 3 的车型判定 A/B 开关。
+
+    cls_vote=False（A 组，默认）: 车型取当前帧检测结果的类别，即原来的
+        ``t["cls"] = dets[best_i][4]`` 行为，保证已有实验数字不失效。
+    cls_vote=True（B 组）: 每条轨迹维护 cls_votes 计数字典，车型取整条轨迹
+        生命周期的众数，单帧误判被多数帧纠正；平票时退化为最近一帧类别。
+
+    注意：无论开关状态，cls_votes / last_cls 都会照常维护，因此 A/B 两组
+    只需切换一个布尔量，其余逻辑（匹配、miss、活跃轨迹过滤）完全相同。
+    """
+
+    def __init__(self, iou_thresh=0.3, max_miss=30, cls_vote=False):
+        self.tracks = []      # {id, bbox, cls, conf, miss, last_cls, cls_votes}
         self.next_id = 1
         self.iou_thresh = iou_thresh
         self.max_miss = max_miss
+        self.cls_vote = bool(cls_vote)
+
+    @staticmethod
+    def _new_track(tid, d):
+        """新建轨迹：同时初始化投票计数，首帧那一票计入。"""
+        c = int(d[4])
+        return {"id": tid, "bbox": d[:4], "cls": c, "conf": d[5], "miss": 0,
+                "last_cls": c, "cls_votes": {c: 1}}
+
+    @staticmethod
+    def _voted_cls(t):
+        """取整条轨迹的类别众数；平票时退化为最近一帧检测类别（A 组行为）。"""
+        votes = t.get("cls_votes") or {}
+        if not votes:
+            return t["cls"]
+        top = max(votes.values())
+        winners = [c for c, v in votes.items() if v == top]
+        if len(winners) == 1:
+            return winners[0]
+        last = t.get("last_cls")
+        return last if last in winners else min(winners)
 
     def update(self, dets):
         # dets: [[x1,y1,x2,y2,cls,conf], ...]
         if not self.tracks:
             for d in dets:
-                self.tracks.append({"id": self.next_id, "bbox": d[:4], "cls": d[4], "conf": d[5], "miss": 0})
+                self.tracks.append(self._new_track(self.next_id, d))
                 self.next_id += 1
-            return self.tracks
+            return self._active()
 
         used_det = set()
         for t in self.tracks:
@@ -37,7 +69,12 @@ class IoUTracker:
                     best_v, best_i = v, i
             if best_i >= 0:
                 t["bbox"] = dets[best_i][:4]
-                t["cls"] = dets[best_i][4]
+                # 每命中一帧就投一票；last_cls 保留本帧原始检测类别，
+                # 供平票时回退，避免投票逻辑改变 A 组的判定语义。
+                c = int(dets[best_i][4])
+                t["last_cls"] = c
+                t["cls_votes"][c] = t["cls_votes"].get(c, 0) + 1
+                t["cls"] = c
                 t["conf"] = dets[best_i][5]
                 t["miss"] = 0
                 used_det.add(best_i)
@@ -46,11 +83,20 @@ class IoUTracker:
 
         for i, d in enumerate(dets):
             if i not in used_det:
-                self.tracks.append({"id": self.next_id, "bbox": d[:4], "cls": d[4], "conf": d[5], "miss": 0})
+                self.tracks.append(self._new_track(self.next_id, d))
                 self.next_id += 1
 
         self.tracks = [t for t in self.tracks if t["miss"] <= self.max_miss]
         # 只把「本帧成功匹配」的活跃轨迹交给下游。miss>0 的是暂留用于后续
         # 重匹配的旧轨迹，其 bbox 保持不变；若一并返回，计数器和标定工具会
         # 把这些静止旧框当成车辆，既虚增每帧框数，也把连续帧位移中位压成 0。
-        return [t for t in self.tracks if t["miss"] == 0]
+        return self._active()
+
+    def _active(self):
+        active = [t for t in self.tracks if t["miss"] == 0]
+        if self.cls_vote:
+            # B 组：用整条轨迹的类别众数覆盖对外暴露的 cls；
+            # 只改输出值，不写回 cls_votes，避免自投票放大。
+            for t in active:
+                t["cls"] = self._voted_cls(t)
+        return active

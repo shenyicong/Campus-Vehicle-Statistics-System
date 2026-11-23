@@ -20,6 +20,9 @@
 >
 > **English** → [README.en.md](README.en.md)
 
+> 🚀 **在线演示（无需安装，直接打开）**：[校园车流数据看板](https://campus-vehicle-dashboard.app.workbuddy.host/?sharecode=XX4GO6JVCQ)
+> （在线 Flask 看板，数据为发布时的固定快照；本地实时版见下方「60 秒跑通」）
+
 ---
 
 ## 目录
@@ -390,6 +393,8 @@ python tools/make_dashboard_snapshot.py           # 无需启动服务的静态�
 | 真实视频评估 | [docs/real_video_eval.md](docs/real_video_eval.md) |
 | 虚拟线标定 | [docs/line_calibration.md](docs/line_calibration.md) |
 | 停车规划方法与边界 | [docs/parking_plan.md](docs/parking_plan.md) |
+| 创新点 3 A/B：车型众数投票 | [docs/ab_innovation_cls_vote.md](docs/ab_innovation_cls_vote.md) |
+| 创新点 3 · 视频端到端 A/B | [docs/ab_innovation3_video.md](docs/ab_innovation3_video.md) |
 | 英文说明 | [README.en.md](README.en.md) |
 
 如果本项目对你有帮助，欢迎 Star ⭐；引用请使用仓库根目录的 [`CITATION.cff`](CITATION.cff)（GitHub 右上角 **Cite this repository** 可直接生成 BibTeX）。

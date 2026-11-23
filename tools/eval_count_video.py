@@ -48,6 +48,11 @@ def main():
                     help="虚拟线归一化 y，务必先用 calibrate_line.py 标定")
     ap.add_argument("--min-move", type=float, default=config.MIN_TRACK_MOVE,
                     help="跨线最小净位移，抑制框抖动假过车")
+    # 创新点 3 A/B：只切这一个开关，其余参数全部固定
+    ap.add_argument("--cls-vote", dest="cls_vote", action="store_true",
+                    default=config.CLS_VOTE, help="B组：车型取整条轨迹众数（默认跟随 CAMPUS_CLS_VOTE）")
+    ap.add_argument("--no-cls-vote", dest="cls_vote", action="store_false",
+                    help="A组：车型取当前帧检测结果")
     ap.add_argument("--max-frames", type=int, default=0, help="0=处理整段视频")
     ap.add_argument("--save-frames", type=int, default=12, help="保存多少张可视化帧")
     args = ap.parse_args()
@@ -77,7 +82,7 @@ def main():
                                 conf=args.conf, iou=config.IOU_THRES,
                                 mode=args.tile, tile_size=config.TILE_SIZE,
                                 overlap=config.TILE_OVERLAP)
-    trk = IoUTracker(iou_thresh=0.3, max_miss=30)
+    trk = IoUTracker(iou_thresh=0.3, max_miss=30, cls_vote=args.cls_vote)
     cnt = LineCounter(line_y=args.line_y, enter_when=config.ENTER_WHEN,
                       classes=config.CLASSES, min_move=args.min_move)
     rep = Reporter(os.path.join(report_dir, "hourly.csv"),
@@ -87,8 +92,9 @@ def main():
 
     print("视频  : %s" % args.video)
     print("规格  : %dx%d  fps=%.1f  总帧=%d  处理帧=%d" % (w, h, fps, total, limit))
-    print("配置  : tile=%s conf=%.2f line_y=%.2f min_move=%.3f\n"
-          % (args.tile, args.conf, args.line_y, args.min_move))
+    print("配置  : tile=%s conf=%.2f line_y=%.2f min_move=%.3f cls_vote=%s\n"
+          % (args.tile, args.conf, args.line_y, args.min_move,
+             "B组(轨迹众数)" if args.cls_vote else "A组(逐帧覆盖)"))
 
     cls_counts, cls_confs = Counter(), defaultdict(list)
     confs, areas, per_frame = [], [], []
@@ -157,8 +163,9 @@ def main():
         "视频        : %s" % args.video,
         "规格        : %dx%d, fps=%.1f, 总帧=%d, 处理帧=%d, 时长≈%.1fs"
         % (w, h, fps, total, frame_i, frame_i / fps),
-        "配置        : tile=%s, conf=%.2f, LINE_Y=%.2f, MIN_TRACK_MOVE=%.3f"
-        % (args.tile, args.conf, args.line_y, args.min_move),
+        "配置        : tile=%s, conf=%.2f, LINE_Y=%.2f, MIN_TRACK_MOVE=%.3f, CLS_VOTE=%s"
+        % (args.tile, args.conf, args.line_y, args.min_move,
+           "B组(轨迹众数)" if args.cls_vote else "A组(逐帧覆盖)"),
         "",
         "--- 检测 ---",
         "检出框总数        : %d" % nb,
@@ -194,7 +201,7 @@ def main():
         "total_frames": total, "processed_frames": frame_i,
         "duration_sec": round(frame_i / fps, 1),
         "tile": args.tile, "conf": args.conf, "line_y": args.line_y,
-        "min_move": args.min_move,
+        "min_move": args.min_move, "cls_vote": args.cls_vote,
         "detection": {
             "total_boxes": nb, "avg_boxes_per_frame": round(nb / n, 3),
             "zero_detect_frames": zero, "zero_rate_pct": round(zero / n * 100, 2),

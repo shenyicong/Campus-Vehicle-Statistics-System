@@ -1,0 +1,73 @@
+{
+  "video": "data/test_monitor.mp4",
+  "width": 650,
+  "height": 434,
+  "fps": 10.0,
+  "total_frames": 1200,
+  "processed_frames": 600,
+  "duration_sec": 60.0,
+  "tile": "grid",
+  "conf": 0.25,
+  "line_y": 0.65,
+  "min_move": 0.03,
+  "cls_vote": false,
+  "detection": {
+    "total_boxes": 707,
+    "avg_boxes_per_frame": 1.178,
+    "zero_detect_frames": 0,
+    "zero_rate_pct": 0.0,
+    "avg_conf": 0.8117,
+    "avg_box_area_pct": 53.97,
+    "per_class": {
+      "sedan": 605,
+      "suv": 98,
+      "truck": 4,
+      "bus": 0
+    },
+    "area_buckets": {
+      "small(<30%)": {
+        "boxes": 89,
+        "avg_conf": 0.6675,
+        "per_class": {
+          "suv": 14,
+          "sedan": 75
+        }
+      },
+      "mid(30-60%)": {
+        "boxes": 324,
+        "avg_conf": 0.8555,
+        "per_class": {
+          "sedan": 298,
+          "suv": 24,
+          "truck": 2
+        }
+      },
+      "huge(>60%)": {
+        "boxes": 294,
+        "avg_conf": 0.8071,
+        "per_class": {
+          "sedan": 232,
+          "suv": 60,
+          "truck": 2
+        }
+      }
+    }
+  },
+  "counting": {
+    "enter": {
+      "sedan": 9,
+      "suv": 1,
+      "truck": 0,
+      "bus": 0
+    },
+    "exit": {
+      "sedan": 7,
+      "suv": 2,
+      "truck": 0,
+      "bus": 0
+    },
+    "total_enter": 10,
+    "total_exit": 9
+  },
+  "saved_frames": 2
+}

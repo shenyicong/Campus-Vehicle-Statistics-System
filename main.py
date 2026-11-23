@@ -34,7 +34,7 @@ def main():
     w = int(cap.get(3)); h = int(cap.get(4)); fps = int(cap.get(5) or 25)
 
     det = build_detector(w, h)
-    trk = IoUTracker(iou_thresh=0.3, max_miss=30)
+    trk = IoUTracker(iou_thresh=0.3, max_miss=30, cls_vote=config.CLS_VOTE)
     cnt = Counter(line_y=config.LINE_Y, enter_when=config.ENTER_WHEN,
                   classes=config.CLASSES, min_move=config.MIN_TRACK_MOVE)
     rep = Reporter(config.HOURLY_CSV, config.DAILY_CSV, config.CLASSES)
@@ -58,6 +58,7 @@ def main():
     rep.export_excel()
     cap.release()
     det.close()
+    print("车型判定:", "B组 轨迹众数投票" if config.CLS_VOTE else "A组 逐帧覆盖")
     print("处理帧数:", frame_i)
     print("累计计数:", cnt.snapshot())
     print("报表已生成:", config.HOURLY_CSV)
